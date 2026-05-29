@@ -82,9 +82,11 @@ class RunRequest(BaseModel):
 def start_run(req: RunRequest):
     import standalone as _sa
 
+    # Read transcript/video from config if not provided in request
     transcript_path = req.transcript_path or _sa.TRANSCRIPT_PATH
     video_path = req.video_path if req.video_path is not None else _sa.VIDEO_PATH
 
+    # Allow URL paths — they are resolved inside the worker subprocess
     _is_url = transcript_path.startswith(("http://", "https://"))
     if not _is_url and not os.path.exists(transcript_path):
         raise HTTPException(
@@ -92,18 +94,15 @@ def start_run(req: RunRequest):
             detail=f"Transcript not found: {transcript_path}"
         )
 
-    try:
-        run_id = runner.start_run(
-            transcript_path=transcript_path,
-            video_path=video_path,
-            clip_mode=req.clip_mode,
-            save_version_flag=req.save_version,
-            prompt_overrides=req.prompt_overrides,
-            code_override=req.code_override,
-        )
-        return {"run_id": run_id, "status": "started"}
-    except RuntimeError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+    run_id = runner.start_run(
+        transcript_path=transcript_path,
+        video_path=video_path,
+        clip_mode=req.clip_mode,
+        save_version_flag=req.save_version,
+        prompt_overrides=req.prompt_overrides,
+        code_override=req.code_override,
+    )
+    return {"run_id": run_id, "status": "started"}
 
 
 @router.get("/stream/{run_id}")

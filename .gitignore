@@ -226,3 +226,5 @@ storage/config.json
 storage/downloads/
 
 .claudia/
+
+storage/downloads/*
