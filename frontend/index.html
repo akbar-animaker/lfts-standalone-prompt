@@ -189,23 +189,24 @@ const STAGE_DETAILS = {
     params:[],
   },
   thumb:{
-    icon:'🖼️',title:'Stage 6 — Thumbnails',step:'Stage 6',color:'#3a1f3b',
-    tagline:'Optional — designs click-worthy thumbnails for the top clips',
-    nontech:"Off by default. When ENABLE_THUMBNAILS is turned on (Config tab), the system takes the highest-scoring clips and designs a social-media thumbnail for each:\n\n1. An \"art director\" prompt invents a unique creative concept for the clip — headline lines, accent colors, palette, and mood — tailored to its title and transcript.\n2. A frame grabbed ~30% of the way into the clip is used as the subject photo.\n3. An image model renders the finished 9:16 thumbnail, which is then uploaded to S3.\n\nEach processed clip gets a thumbnail_url in the output. Requires an OpenAI API key and the openai/Pillow/boto3 packages installed.",
-    inputs:['Top clips by confidence score (per type)','Extracted video frames'],
-    outputs:['thumbnail_url on each processed clip'],
+    icon:'🖼️',title:'Stage 6 — Thumbnails',step:'Stage 6 (opt.)',color:'#2d2a14',
+    tagline:'GPT-4o designs click-worthy 9:16 thumbnails — off by default',
+    nontech:`Off by default (ENABLE_THUMBNAILS = False). When enabled, this is the only stage that uses a non-Anthropic model — GPT-4o from OpenAI.\n\nFor the top clips by confidence score (up to MAX_THUMBNAILS_PER_TYPE from each pipeline), it runs two steps:\n\nStep 1 — Art Direction (GPT-4o as visual art director)\nGPT-4o receives: the clip title, the transcript text, and a video frame grabbed at 30% into the clip. It invents a unique thumbnail concept tailored to that clip — returning a JSON with:\n• Exact color palette (hex values)\n• Headline split into bold ALL-CAPS lines\n• Accent words to highlight\n• Hook tag line\n• Background scene, graphic style, and lighting direction\n\nGPT-4o is explicitly instructed never to reuse generic templates — every thumbnail concept is original to that clip.\n\nStep 2 — Image Generation\nThe creative direction from Step 1 drives the image model to render a finished 9:16 vertical thumbnail, preserving the subject's face from the reference frame. The result is uploaded to S3 and stored as thumbnail_url on the clip.\n\nRequires: OPENAI_API_KEY env var + openai, Pillow, boto3 packages. If any are missing, this stage is silently skipped.`,
+    inputs:['Top clips by confidence score (up to MAX_THUMBNAILS_PER_TYPE per type)','Video frame at 30% into clip duration (extracted at Input stage by ffmpeg)','Clip title and full transcript text'],
+    outputs:['thumbnail_url field added to each processed clip in result.json','9:16 vertical thumbnail image (YouTube Shorts / Reels / TikTok format) uploaded to S3'],
     params:[
-      {k:'ENABLE_THUMBNAILS',v:'Master on/off toggle (default off)'},
-      {k:'MAX_THUMBNAILS_PER_TYPE',v:'How many top clips per type get a thumbnail'},
-      {k:'THUMBNAIL_RESPONSE_MODEL',v:'Vision/image model used for the concept'},
-      {k:'OPENAI_API_KEY / S3_BUCKET',v:'Credentials + upload destination'},
+      {k:'ENABLE_THUMBNAILS',v:'False by default — set True to activate'},
+      {k:'THUMBNAIL_RESPONSE_MODEL',v:'gpt-4o (OpenAI) — art direction + image generation'},
+      {k:'MAX_THUMBNAILS_PER_TYPE',v:'2 — max top clips per type (seq + non-seq) that get thumbnails'},
+      {k:'OPENAI_API_KEY',v:'Required — set via environment variable'},
+      {k:'S3_BUCKET',v:'anim-user-uploads — S3 bucket for thumbnail uploads'},
     ],
   },
   output:{
     icon:'📄',title:'Output Files',step:'Done',color:'#1a3322',
-    tagline:'Final deliverable — a JSON file with every clip ready to cut',
-    nontech:`The pipeline writes two files:\n\nresult.json — contains every selected clip with:\n• Title (in the video language)\n• Exact start and end time\n• Confidence score (0–100) and per-dimension breakdown\n• Pacing details (WPM, filler ratio, dead-air gaps, burst ratio)\n• Which platforms to post on\n• The reason it was selected\n• How many refinement iterations it went through\n• The static scoring weights used (dimension_weights)\n\nspeakers.json — shows which parts of the video belong to which speaker, with contiguous time ranges and full transcripts. Useful for verifying speaker detection before re-running.`,
-    inputs:['Ranked clips from both pipelines','Pacing data attached to each clip','Token usage summary'],
+    tagline:'Final deliverable — JSON files with every clip ready to cut',
+    nontech:`The pipeline writes two files:\n\nresult.json — contains every selected clip with:\n• Title (in the video language)\n• Exact start and end time\n• Confidence score (0–100) and per-dimension breakdown\n• Pacing details (WPM, filler ratio, dead-air gaps, burst ratio)\n• Which platforms to post on\n• The reason it was selected\n• How many refinement iterations it went through\n• Static scoring weights (dimension_weights)\n• thumbnail_url — S3 URL of the generated thumbnail (if Stage 6 was enabled; empty string otherwise)\n\nspeakers.json — shows which parts of the video belong to which speaker, with contiguous time ranges and full transcripts. Useful for verifying speaker detection before re-running.`,
+    inputs:['Ranked clips from both pipelines','Pacing data per clip','thumbnail_url per clip (if Stage 6 ran)','Token usage summary'],
     outputs:['result.json (sequential_clips + non_sequential_shorts + dimension_weights + speakers + metadata)','speakers.json (per-speaker segments, contiguous time ranges, and full transcripts)'],
     params:[{k:'OUTPUT_PATH',v:'Where result.json is written'},{k:'SPEAKERS_OUTPUT_PATH',v:'Where speakers.json is written'}],
   },
@@ -222,7 +223,7 @@ function ArchitectureTab() {
     {id:'a2',    color:'#1f3b3b'},{id:'a4',   color:'#1f3b3b'},
     {id:'scorer',color:'#2d1f4a'},
     {id:'a5',    color:'#3b2d1f'},{id:'rank', color:'#1e3a1e'},
-    {id:'thumb',color:'#3a1f3b'},{id:'output',color:'#1a3322'},
+    {id:'thumb', color:'#2d2a14'},{id:'output',color:'#1a3322'},
   ];
 
   const grid = [
@@ -308,7 +309,7 @@ function ArchitectureTab() {
             {color:'#3b2d5f',label:'Sequential agents'},
             {color:'#1f3b3b',label:'Non-sequential agents'},
             {color:'#2d1f4a',label:'Scorer + Metadata'},
-            {color:'#3a1f3b',label:'Thumbnails (optional)'},
+            {color:'#2d2a14',label:'GPT-4o / OpenAI (optional)'},
           ].map(i=>(
             <div key={i.label} className="flex items-center gap-1.5 text-xs text-gray-400">
               <div className="w-3 h-3 rounded" style={{background:i.color,border:'1px solid #4b5563'}}/>

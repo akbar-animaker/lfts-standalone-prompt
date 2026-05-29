@@ -218,3 +218,6 @@ __marimo__/
 .streamlit/secrets.toml
 
 *.mp4
+
+# Local runtime config (contains API key) — never commit
+storage/config.json

@@ -209,6 +209,43 @@ def restore_version(version_id: str):
     return {"success": True, "message": "Prompts and config restored"}
 
 
+# ── Code Editor ───────────────────────────────────────────────────────────────
+
+_CODE_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "standalone.py",
+)
+
+
+@router.get("/code")
+def get_code():
+    try:
+        with open(_CODE_PATH, "r", encoding="utf-8") as f:
+            content = f.read()
+        return {"content": content, "path": _CODE_PATH}
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="standalone.py not found")
+
+
+class CodeUpdateRequest(BaseModel):
+    content: str
+
+
+@router.put("/code")
+def update_code(req: CodeUpdateRequest):
+    """Save standalone.py then hot-reload the module so the next run uses the new code."""
+    if not req.content.strip():
+        raise HTTPException(status_code=400, detail="Content cannot be empty")
+    with open(_CODE_PATH, "w", encoding="utf-8") as f:
+        f.write(req.content)
+    warn = None
+    try:
+        runner.reload_standalone()
+    except Exception as e:
+        warn = str(e)
+    return {"success": True, "reload_warning": warn}
+
+
 # ── Video ──────────────────────────────────────────────────────────────────────
 
 @router.get("/video")

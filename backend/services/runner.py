@@ -38,6 +38,17 @@ def _patched_assemble(sentence_ids, sentence_by_idx, topic="", reason=""):
 
 _sa._assemble_nonseq_short = _patched_assemble
 
+
+def reload_standalone():
+    """Hot-reload standalone.py after a code edit and re-apply monkey-patches."""
+    import importlib
+    global _sa, _orig_assemble
+    importlib.reload(_sa)
+    # Capture the freshly-loaded original, then re-apply the patch
+    _orig_assemble = _sa._assemble_nonseq_short
+    _sa._assemble_nonseq_short = _patched_assemble
+
+
 # ── Global run state ──────────────────────────────────────────────────────────
 _runs: Dict[str, "RunState"] = {}
 _active_run_id: Optional[str] = None
