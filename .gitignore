@@ -228,3 +228,5 @@ storage/downloads/
 .claudia/
 
 storage/downloads/*
+speakers.json
+storage/runs/*

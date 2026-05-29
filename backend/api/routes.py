@@ -234,6 +234,83 @@ async def serve_run_video(run_id: str, request: Request):
     )
 
 
+# ── Dev bundle (ZIP of all run artefacts) ────────────────────────────────────
+
+@router.get("/runs/{run_id}/bundle")
+async def download_bundle(run_id: str):
+    """Download a ZIP containing all artefacts for a run:
+    run.log, speakers.json, result.json, transcript, video (or URL stubs)."""
+    import io
+    import zipfile
+
+    _BASE_R = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    run_dir        = os.path.join(_BASE_R, "storage", "runs", run_id)
+    run_result_file = os.path.join(_BASE_R, "storage", "runs", f"{run_id}.json")
+    args_path      = os.path.join(run_dir, "run_args.json")
+
+    if not os.path.exists(args_path):
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    with open(args_path, "r", encoding="utf-8") as f:
+        run_args = json.load(f)
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+
+        # 1. Log file
+        log_path = os.path.join(run_dir, "run.log")
+        if os.path.exists(log_path):
+            zf.write(log_path, "run.log")
+        else:
+            # Fall back to in-memory logs if run is still tracked
+            state = runner.get_run(run_id)
+            if state and state.logs:
+                lines = [
+                    f"[{e.get('timestamp','')}] [{e.get('level','INFO')}] {e.get('message','')}"
+                    for e in state.logs
+                ]
+                zf.writestr("run.log", "\n".join(lines))
+            else:
+                zf.writestr("run.log", "(no log available for this run)")
+
+        # 2. speakers.json
+        speakers_path = os.path.join(run_dir, "speakers.json")
+        if os.path.exists(speakers_path):
+            zf.write(speakers_path, "speakers.json")
+
+        # 3. result.json (full result with metadata)
+        if os.path.exists(run_result_file):
+            zf.write(run_result_file, "result.json")
+        else:
+            result_path = os.path.join(run_dir, "result.json")
+            if os.path.exists(result_path):
+                zf.write(result_path, "result.json")
+
+        # 4. Transcript
+        transcript_path = run_args.get("transcript_path", "")
+        if transcript_path.startswith(("http://", "https://")):
+            zf.writestr("transcript_url.txt", transcript_path)
+        elif transcript_path and os.path.exists(transcript_path):
+            zf.write(transcript_path, "transcript.json")
+
+        # 5. Video
+        video_path = run_args.get("video_path", "")
+        if video_path.startswith(("http://", "https://")):
+            zf.writestr("video_url.txt", video_path)
+        elif video_path and os.path.exists(video_path):
+            zf.write(video_path, os.path.basename(video_path))
+
+        # 6. run_args (useful for debugging)
+        zf.write(args_path, "run_args.json")
+
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.read()]),
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename=run_{run_id}_bundle.zip"},
+    )
+
+
 # ── Versions ───────────────────────────────────────────────────────────────────
 
 @router.get("/versions")

@@ -50,6 +50,25 @@ def reload_standalone():
     pass
 
 
+# ── Log persistence ───────────────────────────────────────────────────────────
+
+def _save_logs(run_state: RunState):
+    """Write accumulated logs to storage/runs/{run_id}/run.log."""
+    try:
+        log_dir = os.path.join(_BASE, "storage", "runs", run_state.run_id)
+        os.makedirs(log_dir, exist_ok=True)
+        lines = []
+        for e in run_state.logs:
+            ts  = e.get("timestamp", "")
+            lvl = e.get("level", "INFO")
+            msg = e.get("message", "")
+            lines.append(f"[{ts}] [{lvl}] {msg}")
+        with open(os.path.join(log_dir, "run.log"), "w", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+    except Exception:
+        pass
+
+
 # ── Worker output reader (runs in a daemon thread) ────────────────────────────
 
 def _read_worker(run_state: RunState, proc: subprocess.Popen):
@@ -99,10 +118,12 @@ def _read_worker(run_state: RunState, proc: subprocess.Popen):
                         "result":     result,
                         "video_path": run_state.video_path,
                     })
+                    _save_logs(run_state)
                     run_state.log_queue.put({"type": "done", "status": "success", "summary": summary})
                 else:
                     run_state.status = "error"
                     run_state.error  = msg.get("error", "Unknown error")
+                    _save_logs(run_state)
                     run_state.log_queue.put({"type": "done", "status": "error", "error": run_state.error})
                 break
             else:

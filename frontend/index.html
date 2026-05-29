@@ -1163,6 +1163,14 @@ function OutputTab({ run, videoAvailable }) {
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Run History</span>
           <button onClick={refreshList} className="text-xs text-gray-600 hover:text-gray-400 transition-colors" title="Refresh list">↻</button>
         </div>
+        {selRunId&&(
+          <div className="px-3 py-2 border-b border-border flex-shrink-0">
+            <a href={`/api/runs/${selRunId}/bundle`} download
+              className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-xs font-medium bg-violet-900/40 hover:bg-violet-800/60 text-violet-300 hover:text-violet-100 border border-violet-700/40 transition-all">
+              📦 Dev Analyse
+            </a>
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto">
           {runList.length===0?(
             <div className="p-4 text-xs text-gray-600 text-center">No saved runs yet.</div>
