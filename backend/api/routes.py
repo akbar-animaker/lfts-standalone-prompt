@@ -85,7 +85,8 @@ def start_run(req: RunRequest):
     transcript_path = req.transcript_path or _sa.TRANSCRIPT_PATH
     video_path = req.video_path if req.video_path is not None else _sa.VIDEO_PATH
 
-    if not os.path.exists(transcript_path):
+    _is_url = transcript_path.startswith(("http://", "https://"))
+    if not _is_url and not os.path.exists(transcript_path):
         raise HTTPException(
             status_code=400,
             detail=f"Transcript not found: {transcript_path}"
@@ -266,13 +267,13 @@ def project_fetch(req: ProjectFetchRequest):
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    # Point the running module + persisted config at the freshly downloaded files
-    # so /status, /video and the next run all use them.
+    # Store URLs in config (for display) but point the live module at local paths
+    # so the current session can serve the video and run immediately.
     _sa.TRANSCRIPT_PATH = result["transcript_path"]
     _sa.VIDEO_PATH = result["video_path"] or ""
     storage.save_config({
-        "TRANSCRIPT_PATH": result["transcript_path"],
-        "VIDEO_PATH": result["video_path"] or "",
+        "TRANSCRIPT_PATH": result["transcribe_url"] or result["transcript_path"],
+        "VIDEO_PATH": result["video_url"] or result["video_path"] or "",
     })
     return {"status": "success", **result}
 
@@ -286,8 +287,14 @@ async def serve_video(request: Request):
     element can seek to any timestamp (required for clip preview).
     """
     import standalone as _sa
+    from fastapi.responses import RedirectResponse
     video_path = _sa.VIDEO_PATH
-    if not video_path or not os.path.exists(video_path):
+    if not video_path:
+        raise HTTPException(status_code=404, detail="Video file not found. Check VIDEO_PATH in Config.")
+    # If it's a URL, redirect the browser directly to it
+    if video_path.startswith(("http://", "https://")):
+        return RedirectResponse(url=video_path)
+    if not os.path.exists(video_path):
         raise HTTPException(status_code=404, detail="Video file not found. Check VIDEO_PATH in Config.")
 
     file_size = os.path.getsize(video_path)
@@ -353,11 +360,12 @@ def video_info():
     """Returns metadata about the video file for the player UI."""
     import standalone as _sa
     vp = _sa.VIDEO_PATH
-    exists = bool(vp and os.path.exists(vp))
+    is_url = bool(vp and vp.startswith(("http://", "https://")))
+    exists = bool(vp and (is_url or os.path.exists(vp)))
     return {
         "exists": exists,
         "path": vp,
-        "size_mb": round(os.path.getsize(vp) / 1024 / 1024, 1) if exists else None,
+        "size_mb": round(os.path.getsize(vp) / 1024 / 1024, 1) if (exists and not is_url) else None,
         "url": "/api/video" if exists else None,
     }
 

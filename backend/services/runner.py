@@ -7,8 +7,10 @@ import logging
 import os
 import queue
 import sys
+import tempfile
 import threading
 import traceback
+import urllib.request
 import uuid
 from datetime import datetime
 from typing import Any, Dict, Optional
@@ -136,9 +138,22 @@ def _run_pipeline(
         _log("INFO", f"[PLAYGROUND] Video: {video_path or 'none'}")
         _log("INFO", f"[PLAYGROUND] Mode: {clip_mode}")
 
-        # Load transcript
-        with open(transcript_path, "r", encoding="utf-8") as f:
-            raw = json.load(f)
+        # Load transcript — download first if it's a URL
+        _tmp_transcript = None
+        local_transcript = transcript_path
+        if transcript_path.startswith(("http://", "https://")):
+            _log("INFO", f"[PLAYGROUND] Transcript is a URL — downloading…")
+            _tmp_transcript = tempfile.mktemp(suffix=".json")
+            urllib.request.urlretrieve(transcript_path, _tmp_transcript)
+            local_transcript = _tmp_transcript
+
+        try:
+            with open(local_transcript, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+        finally:
+            if _tmp_transcript and os.path.exists(_tmp_transcript):
+                os.unlink(_tmp_transcript)
+
         transcription_data = raw.get("results", raw)
 
         # Run pipeline (blocking)
