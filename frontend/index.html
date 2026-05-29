@@ -739,9 +739,35 @@ function LogsTab({ run, onStartRun, onFetchProject, fetching, status, projectId,
         <div ref={endRef}/>
       </div>
       {run&&(
-        <div className="px-6 py-2 border-t border-border bg-surface text-xs text-gray-500 flex justify-between flex-shrink-0">
+        <div className="px-6 py-2 border-t border-border bg-surface text-xs text-gray-500 flex items-center justify-between flex-shrink-0">
           <span>Run: <code className="text-gray-400">{run.id}</code></span>
-          <span>{run.logs?.length||0} lines</span>
+          <div className="flex items-center gap-2">
+            <span className="text-gray-600">{run.logs?.length||0} lines</span>
+            <button
+              onClick={()=>{
+                const text=(run.logs||[]).map(e=>e.message).join('\n');
+                const blob=new Blob([text],{type:'text/plain'});
+                const url=URL.createObjectURL(blob);
+                const a=document.createElement('a');
+                a.href=url; a.download=`run_log_${run.id}.txt`; a.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors">
+              ⬇ Log
+            </button>
+            <button
+              disabled={!run.result}
+              onClick={()=>{
+                const blob=new Blob([JSON.stringify(run.result,null,2)],{type:'application/json'});
+                const url=URL.createObjectURL(blob);
+                const a=document.createElement('a');
+                a.href=url; a.download=`result_${run.id}.json`; a.click();
+                URL.revokeObjectURL(url);
+              }}
+              className={`px-2 py-1 rounded transition-colors ${run.result?'bg-gray-700 hover:bg-gray-600 text-gray-300':'bg-gray-800 text-gray-600 cursor-not-allowed'}`}>
+              ⬇ Raw JSON
+            </button>
+          </div>
         </div>
       )}
     </div>
