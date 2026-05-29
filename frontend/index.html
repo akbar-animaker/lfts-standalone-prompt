@@ -607,10 +607,11 @@ function ConfigTab({ config, schema, onSave, onReset }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // LOGS TAB
 // ─────────────────────────────────────────────────────────────────────────────
-function LogsTab({ run, onStartRun, status }) {
+function LogsTab({ run, onStartRun, onFetchProject, fetching, status, projectId, setProjectId }) {
   const endRef=useRef(null);
   const [clipMode,setClipMode]=useState('both');
   const [saveVer,setSaveVer]=useState(false);
+  const busy=run?.status==='running'||fetching;
   useEffect(()=>{ if(endRef.current)endRef.current.scrollIntoView({behavior:'smooth'}); },[run?.logs]);
   const lc={INFO:'text-slate-300',WARNING:'text-amber-400',ERROR:'text-red-400',DEBUG:'text-slate-500'};
   const sc={'PREPROCESS':'text-cyan-400','SEGMENT':'text-sky-400','SPEAKERS':'text-blue-400',
@@ -620,7 +621,23 @@ function LogsTab({ run, onStartRun, status }) {
   const colorLine=m=>{ const x=m?.match(/\[([A-Z_0-9]+)\]/); return x&&sc[x[1]]?sc[x[1]]:null; };
   return(
     <div className="flex flex-col fade-in" style={{height:'calc(100vh - 112px)'}}>
-      <div className="flex items-center gap-4 px-6 py-3 border-b border-border bg-surface flex-shrink-0">
+      <div className="flex items-center gap-3 px-6 py-3 border-b border-border bg-surface flex-shrink-0 flex-wrap">
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-400">Project ID:</label>
+          <input
+            value={projectId}
+            onChange={e=>setProjectId(e.target.value)}
+            onKeyDown={e=>{ if(e.key==='Enter'&&!busy&&projectId.trim()) onFetchProject(projectId,clipMode,saveVer); }}
+            placeholder="e.g. 86683kg"
+            disabled={busy}
+            className="w-40 bg-gray-900 border border-border rounded px-2 py-1 text-sm text-gray-200 outline-none focus:border-accent disabled:opacity-50"/>
+          <button onClick={()=>onFetchProject(projectId,clipMode,saveVer)} disabled={busy||!projectId.trim()}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded text-sm font-medium transition-colors ${busy||!projectId.trim()?'bg-gray-700 text-gray-500 cursor-not-allowed':'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
+            title="Fetch transcript + video from the API and run the pipeline">
+            {fetching?'⬇ Fetching…':'⬇ Fetch & Run'}
+          </button>
+        </div>
+        <span className="text-border">|</span>
         <div className="flex items-center gap-2">
           <label className="text-xs text-gray-400">Mode:</label>
           <select className="bg-gray-900 border border-border rounded px-2 py-1 text-sm text-gray-200 outline-none"
@@ -646,7 +663,7 @@ function LogsTab({ run, onStartRun, status }) {
       </div>
       {!status?.transcript_exists&&(
         <div className="mx-6 mt-3 p-3 rounded bg-red-900/30 border border-red-800 text-sm text-red-300">
-          ⚠ Transcript not found: <code className="font-mono ml-1">{status?.transcript_path}</code> — update path in Config tab.
+          ⚠ Transcript not found: <code className="font-mono ml-1">{status?.transcript_path}</code> — enter a Project ID above to fetch one, or update the path in the Config tab.
         </div>
       )}
       <div className="flex-1 overflow-y-auto px-6 py-4 font-mono text-xs">
@@ -1539,6 +1556,8 @@ function App() {
   const [videoAvailable,setVideoAvailable]=useState(false);
   const [code,setCode]=useState('');
   const [toast,setToast]=useState(null);
+  const [fetching,setFetching]=useState(false);
+  const [projectId,setProjectId]=useState('');
   const sseRef=useRef(null);
 
   const showToast=(msg,type='info')=>setToast({msg,type});
@@ -1597,6 +1616,28 @@ function App() {
     }
   };
 
+  const handleFetchProject=async(projectId,clipMode,saveVer)=>{
+    const pid=(projectId||'').trim();
+    if(!pid){ showToast('Enter a Project ID first','error'); return; }
+    setFetching(true);
+    try{
+      showToast(`Fetching project ${pid}…`,'info');
+      const r=await api.post('/project/fetch',{project_id:pid});
+      if(!r||r.status!=='success') throw new Error(r?.detail||'Failed to fetch project');
+      // Refresh status / video / config so the UI reflects the downloaded files
+      const [st,vi,c]=await Promise.all([api.get('/status'),api.get('/video/info'),api.get('/config')]);
+      setStatus(st); setVideoAvailable(vi.exists||false); setConfig(c);
+      if(r.warning) showToast(r.warning,'error');
+      else showToast(`Downloaded transcript${r.video_path?' + video':''} ✓`,'success');
+      // Process the flow
+      await handleStartRun(clipMode,saveVer);
+    }catch(err){
+      showToast(err.message||'Failed to fetch project','error');
+    }finally{
+      setFetching(false);
+    }
+  };
+
   const handleSaveCode=async(content)=>{
     const r=await api.put('/code',{content});
     setCode(content);
@@ -1650,6 +1691,21 @@ function App() {
               <span className="pulse-dot w-2 h-2 rounded-full bg-yellow-400 inline-block"></span>Running
             </span>
           )}
+          <div className="flex items-center gap-1.5">
+            <input
+              value={projectId}
+              onChange={e=>setProjectId(e.target.value)}
+              onKeyDown={e=>{ if(e.key==='Enter'&&!(run?.status==='running'||fetching)&&projectId.trim()) handleFetchProject(projectId,config.CLIP_MODE||'both',false); }}
+              placeholder="Project ID"
+              disabled={run?.status==='running'||fetching}
+              className="w-32 bg-gray-900 border border-border rounded px-2 py-1.5 text-sm text-gray-200 outline-none focus:border-accent disabled:opacity-50"/>
+            <button onClick={()=>handleFetchProject(projectId,config.CLIP_MODE||'both',false)}
+              disabled={run?.status==='running'||fetching||!projectId.trim()}
+              title="Fetch transcript + video from the API and run the pipeline"
+              className={`px-3 py-1.5 rounded-lg font-semibold text-sm transition-colors ${run?.status==='running'||fetching||!projectId.trim()?'bg-gray-700 text-gray-500 cursor-not-allowed':'bg-emerald-600 hover:bg-emerald-500 text-white'}`}>
+              {fetching?'⬇ Fetching…':'⬇ Fetch & Run'}
+            </button>
+          </div>
           <button onClick={()=>handleStartRun(config.CLIP_MODE||'both',false)}
             disabled={run?.status==='running'||!status?.transcript_exists}
             className={`flex items-center gap-2 px-5 py-2 rounded-lg font-semibold text-sm transition-all ${run?.status==='running'||!status?.transcript_exists?'bg-gray-700 text-gray-500 cursor-not-allowed':'bg-accent hover:bg-violet-600 text-white shadow-lg shadow-violet-900/30'}`}>
@@ -1680,7 +1736,7 @@ function App() {
           {activeTab==='code'&&<CodeTab code={code} onSave={handleSaveCode} onSaveAndRun={()=>handleStartRun(config.CLIP_MODE||'both',false)} running={run?.status==='running'}/>}
           {activeTab==='prompts'&&<PromptsTab prompts={prompts} onSave={handleSavePrompts} onReset={handleResetPrompt}/>}
           {activeTab==='config'&&<ConfigTab config={config} schema={schema} onSave={handleSaveConfig} onReset={handleResetConfig}/>}
-          {activeTab==='logs'&&<LogsTab run={run} onStartRun={handleStartRun} status={status}/>}
+          {activeTab==='logs'&&<LogsTab run={run} onStartRun={handleStartRun} onFetchProject={handleFetchProject} fetching={fetching} status={status} projectId={projectId} setProjectId={setProjectId}/>}
           {activeTab==='output'&&<OutputTab run={run} videoAvailable={videoAvailable}/>}
           {activeTab==='versions'&&<VersionsTab versions={versions} onSave={handleSaveVersion} onRestore={handleRestoreVersion} onDelete={handleDeleteVersion}/>}
           {activeTab==='export'&&<ExportTab run={run}/>}

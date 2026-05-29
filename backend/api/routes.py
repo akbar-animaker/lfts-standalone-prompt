@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from backend.services import storage, runner
+from backend.services import storage, runner, projects
 
 router = APIRouter(prefix="/api")
 
@@ -244,6 +244,33 @@ def update_code(req: CodeUpdateRequest):
     except Exception as e:
         warn = str(e)
     return {"success": True, "reload_warning": warn}
+
+
+# ── Project (fetch transcript + video by ID) ─────────────────────────────────
+
+class ProjectFetchRequest(BaseModel):
+    project_id: str
+
+
+@router.post("/project/fetch")
+def project_fetch(req: ProjectFetchRequest):
+    """Resolve a project ID via the transcribe API, download the transcript +
+    video locally, and point the pipeline (and UI) at the downloaded files."""
+    import standalone as _sa
+    try:
+        result = projects.fetch_project(req.project_id)
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Point the running module + persisted config at the freshly downloaded files
+    # so /status, /video and the next run all use them.
+    _sa.TRANSCRIPT_PATH = result["transcript_path"]
+    _sa.VIDEO_PATH = result["video_path"] or ""
+    storage.save_config({
+        "TRANSCRIPT_PATH": result["transcript_path"],
+        "VIDEO_PATH": result["video_path"] or "",
+    })
+    return {"status": "success", **result}
 
 
 # ── Video ──────────────────────────────────────────────────────────────────────
