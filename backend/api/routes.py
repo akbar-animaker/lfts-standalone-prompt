@@ -185,7 +185,7 @@ def get_run_result(run_id: str):
     raise HTTPException(status_code=404, detail="Result not found")
 
 
-@router.get("/runs/{run_id}/video")
+@router.api_route("/runs/{run_id}/video", methods=["GET", "HEAD"])
 async def serve_run_video(run_id: str, request: Request):
     """Serve the video for a specific run — isolated from the global VIDEO_PATH."""
     from fastapi.responses import RedirectResponse
