@@ -95,97 +95,97 @@ const STAGE_DETAILS = {
   input:{
     icon:'📂',title:'Input Files',step:'Start',color:'#334155',
     tagline:'Where your content enters the system',
-    nontech:`You provide two files to the system:\n\n1. A transcript file (transcript.json) — this is the text of what was said in the video, produced by AWS Transcribe. It includes every word with exact timestamps down to the millisecond.\n\n2. A video file (input.mp4) — optional. If provided, the system extracts frames every 30 seconds so the AI can visually identify interview formats, speaker changes, or whether someone is presenting to a screen.\n\nEverything the AI does downstream is based entirely on what's in these two files.`,
-    inputs:['transcript.json — AWS Transcribe format with word-level timestamps','input.mp4 — video file (optional, enables visual context)'],
-    outputs:['Raw transcript data → Stage 1','Video frames (if provided) → passed to Agent #1'],
-    params:[{k:'TRANSCRIPT_PATH',v:'Path to transcript.json'},{k:'VIDEO_PATH',v:'Path to video file'},{k:'CLIP_MODE',v:'both | sequential | non_sequential'}],
-  },
-  s0:{
-    icon:'🏷️',title:'Stage 0 — Category Detection',step:'Stage 0',color:'#1e3a5f',
-    tagline:'Understands what kind of video this is, then sets the scoring rules',
-    nontech:"Before picking a single clip, the AI reads the first part of your transcript and asks: What kind of video is this?\n\nA comedy show clip needs a strong punchline. A business interview clip needs a clear, shareable insight. A product demo clip needs a strong hook and clear explanation.\n\nOnce it identifies the category, it assigns different importance weights to the 6 scoring dimensions — so clips are judged by the right standard for their audience, not a one-size-fits-all rule.\n\nFor example: a podcast gets high weight on 'Hook Strength'. A tutorial gets high weight on 'Standalone Clarity'. A motivational talk gets high weight on 'Emotional Resonance'.",
-    inputs:['First 3,000 characters of the merged transcript'],
-    outputs:['Video category name (e.g. "podcast_interview", "sales_demo")','6 scoring weights — integers that must sum to 100','Per-dimension reasoning explaining why each weight was chosen'],
-    params:[{k:'CLAUDE_MODEL',v:'LLM used'},{k:'CLAUDE_MAX_TOKENS',v:'Max response tokens'}],
+    nontech:`You provide two files:\n\n1. transcript.json — the full text of your video produced by AWS Transcribe. Every word has an exact timestamp (start and end time to the millisecond). This is the primary input.\n\n2. input.mp4 — the video file (optional). If provided, the system extracts one frame every 30 seconds (up to 20 frames total) and sends them to Agent #1 so it can visually see the recording format: interview-style, presenter + screen, solo talking-head, etc. The video is never processed for audio — only screenshots.\n\nEverything the AI does is based on these two files.`,
+    inputs:['transcript.json — AWS Transcribe format with word-level timestamps','input.mp4 — video file (optional, enables visual context for Agent #1)'],
+    outputs:['Raw transcript data → Stage 1','Video frames as images (if provided) → passed to Agent #1'],
+    params:[{k:'TRANSCRIPT_PATH',v:'Path to transcript.json'},{k:'VIDEO_PATH',v:'Path to video file (leave empty to skip)'},{k:'CLIP_MODE',v:'both | sequential | non_sequential'}],
   },
   s1:{
     icon:'⚙️',title:'Stage 1 — Preprocess',step:'Stage 1',color:'#1e3a5f',
-    tagline:'Turns a wall of words into clean, timestamped sentences',
-    nontech:`AWS Transcribe gives you thousands of individual words — each with a start and end time. This stage groups them into proper sentences by splitting on punctuation marks (. ? !) and records the exact time each sentence starts and ends in the video.\n\nFor example:\n"Hello" at 0.2s + "my" at 0.4s + "name" at 0.6s + "is" at 0.8s + "Sarah." at 1.0s\n→ becomes one Sentence: "Hello my name is Sarah." starting at 0.2s, ending at 1.0s\n\nIt also detects the language of the video (English, Hindi, Spanish, etc.) which is used later for generating titles in the right language.`,
-    inputs:['Raw AWS Transcribe items array (words + punctuation with timestamps)'],
-    outputs:['Clean list of sentences — each with: index number, start time, end time, text','Total video duration in seconds','Language code (e.g. en-US, hi-IN)'],
+    tagline:'Turns thousands of individual words into clean, timestamped sentences',
+    nontech:`AWS Transcribe gives you thousands of individual words — each with a start and end time. This stage groups them into proper sentences by splitting on punctuation (. ? !) and records the exact time each sentence begins and ends in the video.\n\nExample:\n"Hello" 0.2s + "my" 0.4s + "name" 0.6s + "is" 0.8s + "Sarah." 1.0s\n→ Sentence: "Hello my name is Sarah." — starts 0.2s, ends 1.0s\n\nIt also keeps every word with its timestamp in a flat list (all_words). This word-level timing data is used later by the Pacing Analyser to measure speaking speed and silence gaps without any AI.\n\nFinally, it detects the video language (English, Hindi, Spanish, etc.) for use in title generation.`,
+    inputs:['Raw AWS Transcribe items array (words + punctuation, each with timestamps)'],
+    outputs:['Sentence list — each with: index, start time, end time, text','all_words — flat list of every word with timestamps (feeds Pacing Analyser)','Video duration in seconds','Language code (e.g. en-US, hi-IN)'],
     params:[],
   },
   s1b:{
     icon:'🎙️',title:'Stage 1b — Speaker Detection',step:'Stage 1b',color:'#2d3a5f',
-    tagline:'Figures out who is speaking each sentence — the most important boundary',
-    nontech:"AWS Transcribe often gives you a single stream of text with no speaker labels. But your video might have:\n• An interviewer asking questions + a guest answering\n• A main presenter + an embedded product demo video\n• A role-play between a customer and an advisor\n\nThis stage reads the full transcript and identifies every distinct voice. It then assigns each sentence to the correct speaker.\n\nWhy this matters: clips are NEVER allowed to cross a speaker boundary. A clip cannot mix the interviewer's question with the guest's answer from a different topic. Think of it as drawing invisible dividing lines in the transcript wherever the speaker changes.",
-    inputs:['All sentences with timestamps and gap markers between them'],
-    outputs:['Speaker list — each with name, role, and the sentence indices they speak','speakers.json file written to disk for verification','Boundary map used to constrain clip windows in Stage 2'],
-    params:[{k:'SECTION_BREAK_GAP_THRESHOLD',v:'Silence gap (seconds) that signals a new speaker section'}],
+    tagline:'Identifies every distinct voice and draws boundaries the AI can never cross',
+    nontech:`AWS Transcribe gives you one continuous stream of text with no speaker labels. But your video might have:\n• An interviewer asking questions + a guest answering\n• A main presenter + an embedded product demo clip\n• A role-play between a customer and an advisor\n\nThis stage reads the full transcript, identifies every distinct voice, and assigns each sentence to a speaker.\n\nWhy it matters: clips are NEVER allowed to cross a speaker boundary. A clip cannot mix the interviewer's question with a guest answer from a different topic. These boundaries act as invisible dividing lines in the transcript.\n\nA speakers.json reference file is written to disk immediately after this stage — even if later stages fail, you can inspect who was detected.`,
+    inputs:['All sentences with timestamps'],
+    outputs:['Speaker list — each with: name, role, and the sentence indices they speak','speakers.json written to disk immediately for verification','Boundary map used to constrain clip windows in Stage 2'],
+    params:[{k:'SECTION_BREAK_GAP_THRESHOLD',v:'Silence gap (seconds) that marks a new speaker section'}],
   },
   s2:{
     icon:'✂️',title:'Stage 2 — Segmentation',step:'Stage 2',color:'#2d3a5f',
-    tagline:'Creates every possible clip candidate, never crossing speaker boundaries',
-    nontech:"Imagine going through the transcript and highlighting every possible clip — every combination of consecutive sentences that's long enough to be worth watching and short enough for social media.\n\nThis stage does that automatically — but with one iron rule: no clip may cross a speaker boundary. A clip is either 100% from the main presenter, or 100% from the embedded video, or 100% from the demo — never a mixture.\n\nThe result is a long list of 'candidate windows' — each one is a slice of the video with known start time, end time, and full text.",
+    tagline:'Generates every valid clip candidate, never crossing a speaker boundary',
+    nontech:`Imagine highlighting every possible clip in the transcript — every combination of consecutive sentences that fits within the allowed duration range for social media.\n\nThis stage does that automatically, but with one hard rule: no clip may ever cross a speaker boundary. A clip is 100% from one speaker section — never a mix.\n\nEach candidate window is tagged with its speaker section (so agents know who is speaking), start time, end time, duration, and the full text of all sentences it contains.\n\nThe result is a list of candidate windows passed to Agent #1.`,
     inputs:['Sentence list','Speaker boundary map from Stage 1b'],
-    outputs:['Candidate windows — each with: ID, start time, end time, duration, full text, speaker label'],
+    outputs:['Candidate windows — each with: ID, start/end time, duration, text, speaker label and section type'],
     params:[{k:'SEQUENTIAL_MIN_DURATION',v:'Minimum clip length in seconds'},{k:'SOCIAL_MEDIA_MAX_DURATION',v:'Maximum clip length (YouTube Shorts ceiling = 180s)'}],
+  },
+  pacing:{
+    icon:'📈',title:'Pacing Analysis',step:'Auto-scorer',color:'#1a2f3a',
+    tagline:'Measures speaking speed, silence gaps, and filler words — no AI needed',
+    nontech:`This is the only scoring dimension that never uses an AI model — it is computed purely from the word timestamps produced by Stage 1.\n\nFor each clip it measures four things:\n1. Words Per Minute (WPM) — is the speaker talking too fast, too slow, or at the right pace?\n2. Filler ratio — what fraction of words are fillers like "um", "uh", "like", "you know"?\n3. Dead-air gaps — how many pauses longer than 1.5 seconds are inside the clip?\n4. Burst ratio — what fraction of words come in very rapid runs of speech?\n\nThese four measurements combine into a Pacing Score from 0 to 20. This becomes the 7th scoring dimension alongside the 6 that the AI judges.\n\nBecause it is deterministic (no AI), the same clip always gets the exact same pacing score — no randomness, no token cost.`,
+    inputs:['all_words — flat word list with timestamps from Stage 1','Clip start and end times'],
+    outputs:['Pacing score 0–20 (the 7th scoring dimension)','WPM, filler ratio, dead-air gap count, burst ratio — all included in result.json'],
+    params:[{k:'SCORING_WEIGHTS_RAW',v:'pacing_energy weight = 7 (fixed static weight, same for every video)'}],
   },
   a1:{
     icon:'🤖',title:'Agent #1 — Sequential Selection',step:'Step 3a',color:'#3b2d5f',
-    tagline:'Picks the best uninterrupted single-window clips',
-    nontech:"This is the first AI agent doing creative work. It reads every candidate clip window and selects the ones most likely to perform well on social media.\n\nIt acts like a professional video editor who asks: Does this clip have a strong hook in the first 3 seconds? Does it deliver a clear insight? Can someone who has never seen the full video understand it completely? Does it end satisfyingly?\n\nOnly clips that score 75/100 or above are selected. The number of clips is scaled to the video length (roughly 1 clip per 10 minutes of video).",
-    inputs:['All candidate windows with text, duration, speaker labels','Dynamic scoring framework from Stage 0'],
+    tagline:'Picks the best uninterrupted single-window clips from all candidates',
+    nontech:`This is the first AI agent doing creative work. It reads every candidate clip window and selects the ones most likely to perform well on social media.\n\nIt acts like a professional video editor asking: Does this clip have a strong hook? Does it deliver a clear insight? Can someone who never saw the full video understand it? Does it end satisfyingly?\n\nPerformance trick — prompt caching: the entire candidate window list is sent with caching enabled. After the first run, the model stores the window block in its cache. Subsequent runs (prompt edits, reruns) skip reprocessing the windows and cost roughly 90% fewer tokens.\n\nIf a video file was provided, Agent #1 also receives the extracted video frames as images so it can see the visual format of the recording.`,
+    inputs:['All candidate windows with text, duration, speaker labels (prompt-cached)','Video frames as images (optional, if input.mp4 was provided)','Static scoring weights: 7 dimensions summing to 100'],
     outputs:['Selected window IDs with reasons why each was chosen'],
-    params:[{k:'TARGET_SCORE',v:'Minimum score to pass (75/100 threshold)'},{k:'SOCIAL_MEDIA_MAX_DURATION',v:'Hard ceiling for clip length'}],
+    params:[{k:'TARGET_SCORE',v:'Minimum score to pass selection (75/100 threshold)'},{k:'SOCIAL_MEDIA_MAX_DURATION',v:'Hard ceiling for clip length'}],
   },
   a3:{
     icon:'🔧',title:'Agent #3 — Sequential Refinement',step:'Step 3a',color:'#3b2d5f',
     tagline:'Fine-tunes clip boundaries to fix weak hooks or abrupt endings',
-    nontech:"After Agent #1 selects a clip, this agent asks: can we improve it by starting a few seconds earlier or ending a few seconds later?\n\nFor example: if a clip opens mid-sentence with '...and that's why we changed everything', the agent searches nearby windows to find one that starts with a complete, attention-grabbing opener instead — like 'Three years ago we nearly went bankrupt — and that's why we changed everything.'\n\nCrucial rule: it NEVER switches to a different topic. It only adjusts the start/end boundaries of the same clip.",
-    inputs:['Selected clip + neighboring windows within ±35 seconds','Score and per-dimension reasoning from the Scorer'],
-    outputs:['Refined clip with adjusted start/end time + improved score breakdown'],
-    params:[{k:'MAX_ITERATIONS_PER_SHORT',v:'Max refinement rounds per clip'},{k:'REFINE_PAD',v:'Seconds of context exposed on each side for boundary options'}],
+    nontech:`After Agent #1 selects a clip, this agent asks: can we improve it by starting a sentence earlier or ending a sentence later?\n\nFor example: if a clip opens mid-sentence, the agent searches nearby windows to find one that starts with a complete attention-grabbing opener instead.\n\nCrucial rule: it NEVER switches to a different topic. It only adjusts start/end boundaries within the same speaker section.\n\nThe Scorer runs first. If the clip already scores above the target (90/100), refinement is skipped entirely. Otherwise, one refinement pass is run (MAX_ITERATIONS = 1).`,
+    inputs:['Selected clip + neighboring windows within the same speaker section (±35 seconds)','Score and per-dimension reasoning from the Scorer'],
+    outputs:['Refined clip with adjusted start/end time and improved score breakdown'],
+    params:[{k:'MAX_ITERATIONS_PER_SHORT_SEQUENCE',v:'1 — one refinement pass per clip'},{k:'REFINE_PAD',v:'Seconds of context exposed on each side for boundary options'}],
   },
   a2:{
     icon:'🤖',title:'Agent #2 — Non-Sequential Selection',step:'Step 3b',color:'#1f3b3b',
     tagline:'Stitches together the best moments from anywhere in the video',
-    nontech:"Some of the most powerful social media clips aren't one continuous moment — they're the best 30 seconds from different parts of an hour-long video, stitched together into one coherent story.\n\nThis agent reads all individual sentences from across the ENTIRE video and picks combinations that tell one complete, compelling story — even if the sentences are 20 minutes apart in the original recording.\n\nFor example: the setup from minute 5, the key insight from minute 32, and the powerful closing line from minute 58 could become one 45-second clip that makes perfect sense.",
-    inputs:['All individual sentences from the complete transcript','Dynamic scoring framework from Stage 0'],
-    outputs:['Multi-segment shorts — each with: list of sentence IDs from anywhere in the video, total duration, reason'],
+    nontech:`Some of the most powerful clips are not one continuous moment — they are the best 30 seconds from different parts of an hour-long video, stitched into one coherent story.\n\nThis agent reads all individual sentences from across the ENTIRE transcript and picks combinations that tell one complete, compelling story — even if the sentences are 20 minutes apart.\n\nExample: the setup from minute 5, the key insight from minute 32, and the closing line from minute 58 could become one 45-second clip that makes perfect sense on its own.\n\nPerformance trick — prompt caching: the full sentence list is sent with caching enabled, just like Agent #1's window list. Reruns cost roughly 90% fewer tokens.`,
+    inputs:['All individual sentences from the complete transcript (prompt-cached)','Static scoring weights: 7 dimensions summing to 100'],
+    outputs:['Multi-segment shorts — each with: sentence IDs from anywhere in the video, total duration, reason'],
     params:[{k:'NON_SEQUENTIAL_MIN_DURATION',v:'Min total duration'},{k:'NON_SEQUENTIAL_MAX_DURATION',v:'Max total duration'}],
   },
   a4:{
     icon:'🔧',title:'Agent #4 — Non-Sequential Refinement',step:'Step 3b',color:'#1f3b3b',
-    tagline:'Improves assembled clips by swapping, adding or removing sentences',
-    nontech:"Like Agent #3 refines single-window clips, this agent refines multi-segment shorts.\n\nIt might: swap the opening sentence for one with a stronger hook, drop a trailing sentence that weakens the ending, or add a sentence that provides missing context.\n\nOne safety rule: it can only draw from sentences within 60 seconds of the short's existing span — this prevents the AI from grafting in completely unrelated content from elsewhere in the video.",
+    tagline:'Scores assembled clips — refinement iterations disabled by default',
+    nontech:`Like Agent #3 refines single-window clips, this agent can refine multi-segment shorts by swapping, adding, or removing sentences.\n\nBy default, MAX_ITERATIONS = 0: the Scorer is run and the result is collected, but no refinement passes are attempted. The short moves on as-is.\n\nIf iterations were enabled, the agent could swap the opening sentence for one with a stronger hook, drop a trailing sentence that weakens the ending, or add a sentence providing missing context.\n\nSafety rule: it can only draw from sentences within 60 seconds of the short's existing time span — preventing unrelated content from being grafted in from elsewhere in the video.`,
     inputs:["Current short's sentence IDs + full sentence list","Score and weakest-factor analysis from the Scorer"],
-    outputs:['Refined short with updated sentence selection + improved score'],
-    params:[{k:'REFINE_NONSEQ_PAD',v:'Maximum seconds away from current span for replacement sentences'}],
+    outputs:['Scored short with confidence score and breakdown (no boundary changes by default)'],
+    params:[{k:'MAX_ITERATIONS_PER_SHORT_NONSEQUENCE',v:'0 — scoring only, no refinement by default'},{k:'REFINE_NONSEQ_PAD',v:'60s — max distance from current span for replacement sentences'}],
   },
   scorer:{
     icon:'⭐',title:'Scorer (used by Agents #3 and #4)',step:'Inside #3/#4',color:'#2d1f4a',
-    tagline:'Gives every clip a 0–100 score across 6 dimensions',
-    nontech:"Before refinement can happen, each clip needs a quality score. The scorer evaluates every clip on exactly 6 dimensions:\n\n1. Hook Strength — does the first sentence immediately grab attention?\n2. Reframe / Insight — does it make you think differently about something?\n3. Emotional Resonance — does it make you feel something?\n4. Standalone Clarity — can someone who never saw the full video understand it completely?\n5. Quotability — is there a line you'd want to share or remember?\n6. Clean Ending — does it end at a satisfying, resolved moment?\n\nThe weights for each dimension were set in Stage 0 based on the video category.",
-    inputs:['Clip text preview (first 100 words)','Video category + dynamic weights from Stage 0'],
-    outputs:['Score 0–100 (weighted sum)','Per-dimension scores','Weakest factor name','Specific improvement advice'],
-    params:[{k:'TARGET_SCORE',v:'Score at which refinement stops (90/100 target)'},{k:'SCORE_MARKET_ADJUSTMENT',v:'Global score adjustment applied to all dimensions'}],
+    tagline:'Gives every clip a 0–100 score across 7 dimensions — 6 AI-judged + 1 automatic',
+    nontech:`Every clip is scored on 7 dimensions. Six are judged by the AI; one is computed automatically from word timestamps by the Pacing Analyser.\n\nThe 7 dimensions and their fixed weights (always sum to 100 — they do NOT change based on video type):\n\n• Hook Strength — 23 pts. Does the first sentence grab attention immediately?\n• Reframe / Insight — 18 pts. Does it make you think differently?\n• Emotional Resonance — 17 pts. Does it make you feel something?\n• Standalone Clarity — 16 pts. Can someone understand it without context?\n• Quotability — 11 pts. Is there a line you would share or remember?\n• Clean Ending — 8 pts. Does it end at a satisfying, resolved moment?\n• Pacing Energy — 7 pts. Auto-computed: speaking speed, filler words, silence gaps.\n\nA clip scoring above 90 skips refinement. Below 90, the relevant refinement agent adjusts the clip and scores again.`,
+    inputs:['Clip text (first 100 words for LLM scoring)','Clip timestamps + all_words (for pacing computation)'],
+    outputs:['Total score 0–100 (weighted sum of all 7 dimensions)','Per-dimension scores and AI reasoning','Weakest factor name','Specific improvement advice for the refinement agent'],
+    params:[{k:'TARGET_SCORE',v:'90/100 — above this score, refinement is skipped'},{k:'SCORE_MARKET_ADJUSTMENT',v:'Global score offset applied to all dimensions'}],
   },
   a5:{
     icon:'📋',title:'Agent #5 — Final Metadata',step:'Stage 4',color:'#3b2d1f',
     tagline:'Writes a title for each clip and recommends which platforms to post on',
-    nontech:"Once all clips are selected and scored, this agent writes a punchy 6–8 word title for each one.\n\nImportant: titles are written in the video's original language. If your video is in Hindi, titles come out in Hindi. If it's in Tamil, titles come out in Tamil.\n\nIt also recommends which platforms each clip should go on, based on duration:\n• Under 90 seconds → TikTok, Instagram Reels, YouTube Shorts, LinkedIn\n• 90–180 seconds → YouTube Shorts and LinkedIn only (TikTok/Instagram cap at 90s)",
-    inputs:['All clips with type, duration, score, category, text preview','Detected language code from Stage 1'],
-    outputs:['Title per clip (in native language)','Platforms array per clip'],
+    nontech:`Once all clips are selected and scored, this agent writes a punchy 6–8 word title for each one.\n\nImportant: titles are written in the video's original language. If your video is in Hindi, titles come out in Hindi. If it is in Tamil, titles come out in Tamil.\n\nIt also recommends which platforms each clip should go on, based on duration:\n• Under 90 seconds → TikTok, Instagram Reels, YouTube Shorts, LinkedIn\n• 90–180 seconds → YouTube Shorts and LinkedIn only (TikTok and Instagram cap at 90s)`,
+    inputs:['All clips with type, duration, score, and text preview','Language code from Stage 1'],
+    outputs:['Title per clip (written in the video language)','Platforms array per clip: instagram, tiktok, youtube, linkedin'],
     params:[{k:'SOCIAL_MEDIA_MAX_DURATION',v:'Determines platform eligibility cutoffs'}],
   },
   rank:{
     icon:'📊',title:'Stage 5 — Ranking',step:'Stage 5',color:'#1e3a1e',
     tagline:'Sorts everything into a logical order for the human editor',
-    nontech:"Simple but important: sequential clips are sorted by their position in the video (earliest clip first), making it easy to scan through the video in order. Non-sequential shorts are sorted by quality score (best clip first), so the editor sees the strongest content immediately.",
-    inputs:['All clips from both sequential and non-sequential pipelines'],
-    outputs:['Ordered sequential_clips (by video position)','Ordered non_sequential_shorts (by confidence score)'],
+    nontech:`Simple but important:\n\nSequential clips are sorted by their position in the video (earliest first), making it easy for an editor to scrub through the timeline in order.\n\nNon-sequential shorts are sorted by confidence score (best clip first), so the editor sees the strongest assembled content immediately.\n\nPacing data (WPM, filler ratio, dead-air gaps, burst ratio) is attached to every clip at this point and included in the final result.json.`,
+    inputs:['All clips from both sequential and non-sequential pipelines (with scores and pacing)'],
+    outputs:['Ordered sequential_clips (by video start time ascending)','Ordered non_sequential_shorts (by confidence score descending)'],
     params:[],
   },
   thumb:{
@@ -204,9 +204,9 @@ const STAGE_DETAILS = {
   output:{
     icon:'📄',title:'Output Files',step:'Done',color:'#1a3322',
     tagline:'Final deliverable — a JSON file with every clip ready to cut',
-    nontech:"The pipeline writes two files:\n\nresult.json — contains every selected clip with:\n• Title (in the video's language)\n• Exact start and end time in the video\n• Quality score and per-dimension breakdown\n• Which platforms to post on\n• The reason it was selected\n• Iteration history (how many refinements were needed)\n\nspeakers.json — shows which parts of the video belong to which speaker, with time ranges and transcripts. Useful for verifying the speaker boundary detection.",
-    inputs:['Ranked clips from both pipelines','Token usage summary'],
-    outputs:['result.json (sequential_clips + non_sequential_shorts + metadata)','speakers.json (per-speaker segments and transcripts)'],
+    nontech:`The pipeline writes two files:\n\nresult.json — contains every selected clip with:\n• Title (in the video language)\n• Exact start and end time\n• Confidence score (0–100) and per-dimension breakdown\n• Pacing details (WPM, filler ratio, dead-air gaps, burst ratio)\n• Which platforms to post on\n• The reason it was selected\n• How many refinement iterations it went through\n• The static scoring weights used (dimension_weights)\n\nspeakers.json — shows which parts of the video belong to which speaker, with contiguous time ranges and full transcripts. Useful for verifying speaker detection before re-running.`,
+    inputs:['Ranked clips from both pipelines','Pacing data attached to each clip','Token usage summary'],
+    outputs:['result.json (sequential_clips + non_sequential_shorts + dimension_weights + speakers + metadata)','speakers.json (per-speaker segments, contiguous time ranges, and full transcripts)'],
     params:[{k:'OUTPUT_PATH',v:'Where result.json is written'},{k:'SPEAKERS_OUTPUT_PATH',v:'Where speakers.json is written'}],
   },
 };
@@ -215,19 +215,20 @@ function ArchitectureTab() {
   const [sel, setSel] = useState(null);
 
   const stages = [
-    {id:'input', color:'#334155'},{id:'s0', color:'#1e3a5f'},{id:'s1', color:'#1e3a5f'},
-    {id:'s1b',  color:'#2d3a5f'},{id:'s2', color:'#2d3a5f'},
-    {id:'a1',   color:'#3b2d5f'},{id:'a3', color:'#3b2d5f'},
-    {id:'a2',   color:'#1f3b3b'},{id:'a4', color:'#1f3b3b'},
+    {id:'input',  color:'#334155'},{id:'s1',   color:'#1e3a5f'},
+    {id:'s1b',   color:'#2d3a5f'},{id:'s2',   color:'#2d3a5f'},
+    {id:'pacing',color:'#1a2f3a'},
+    {id:'a1',    color:'#3b2d5f'},{id:'a3',   color:'#3b2d5f'},
+    {id:'a2',    color:'#1f3b3b'},{id:'a4',   color:'#1f3b3b'},
     {id:'scorer',color:'#2d1f4a'},
-    {id:'a5',   color:'#3b2d1f'},{id:'rank',color:'#1e3a1e'},
+    {id:'a5',    color:'#3b2d1f'},{id:'rank', color:'#1e3a1e'},
     {id:'thumb',color:'#3a1f3b'},{id:'output',color:'#1a3322'},
   ];
 
   const grid = [
     // [id, col, row]
-    ['input',0,0],['s0',1,0],['s1',2,0],['s1b',3,0],['s2',4,0],
-    ['a1',1,1],['a3',2,1],['a2',3,1],['a4',4,1],
+    ['input',0,0],['s1',1,0],['s1b',2,0],['s2',3,0],
+    ['pacing',0,1],['a1',1,1],['a3',2,1],['a2',3,1],['a4',4,1],
     ['scorer',0,2],['a5',1,2],['rank',2,2],['thumb',3,2],['output',4,2],
   ];
 
@@ -240,11 +241,12 @@ function ArchitectureTab() {
   grid.forEach(([id,col,row])=>{ pmap[id]=pos(col,row); });
 
   const arrows = [
-    ['input','s0'],['s0','s1'],['s1','s1b'],['s1b','s2'],
+    ['input','s1'],['s1','s1b'],['s1b','s2'],
     ['s2','a1'],['a1','a3'],
     ['s2','a2'],['a2','a4'],
     ['a3','a5'],['a4','a5'],
     ['scorer','a3'],['scorer','a4'],
+    ['pacing','scorer'],
     ['a5','rank'],['rank','thumb'],['thumb','output'],
   ];
 
@@ -263,9 +265,17 @@ function ArchitectureTab() {
             <marker id="ah" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
               <polygon points="0 0,8 3,0 6" fill="#4b5563"/>
             </marker>
+            <marker id="ahv" markerWidth="6" markerHeight="8" refX="3" refY="7" orient="auto">
+              <polygon points="0 0,3 8,6 0" fill="#4b5563"/>
+            </marker>
           </defs>
           {arrows.map(([f,t])=>{
             const a=pmap[f],b=pmap[t]; if(!a||!b)return null;
+            // Vertical arrow: same column or target is behind source
+            if(Math.abs((a.x+W/2)-(b.x+W/2))<W/2 && b.y > a.y){
+              const vx=a.x+W/2, vy1=a.y+H, vy2=b.y;
+              return <line key={`${f}-${t}`} x1={vx} y1={vy1} x2={vx} y2={vy2+2} stroke="#4b5563" strokeWidth="1.5" markerEnd="url(#ahv)"/>;
+            }
             const ax=a.x+W, ay=a.y+H/2, bx=b.x, by=b.y+H/2;
             if(Math.abs(ay-by)<4)
               return <line key={`${f}-${t}`} x1={ax} y1={ay} x2={bx-2} y2={by} stroke="#4b5563" strokeWidth="1.5" markerEnd="url(#ah)"/>;
@@ -294,10 +304,10 @@ function ArchitectureTab() {
         <div className="mt-6 flex flex-wrap gap-3">
           {[
             {color:'#1e3a5f',label:'Core pipeline'},
+            {color:'#1a2f3a',label:'Auto pacing (no AI)'},
             {color:'#3b2d5f',label:'Sequential agents'},
             {color:'#1f3b3b',label:'Non-sequential agents'},
-            {color:'#2d1f4a',label:'Scorer'},
-            {color:'#3b2d1f',label:'Metadata + Ranking'},
+            {color:'#2d1f4a',label:'Scorer + Metadata'},
             {color:'#3a1f3b',label:'Thumbnails (optional)'},
           ].map(i=>(
             <div key={i.label} className="flex items-center gap-1.5 text-xs text-gray-400">
@@ -369,20 +379,19 @@ function ArchitectureTab() {
 // PROMPTS TAB — ordered to match pipeline flow
 // ─────────────────────────────────────────────────────────────────────────────
 const PROMPT_LABELS = {
-  CATEGORY_DETECTION_PROMPT: { label:'Category Detector',         icon:'🏷️', step:'Stage 0',  desc:'Identifies video type + sets dynamic scoring weights' },
   SPEAKER_DETECTION_PROMPT:  { label:'Speaker Detector',          icon:'🎙️', step:'Stage 1b', desc:'Assigns every sentence to a speaker' },
   SEQUENCE_PROMPT:           { label:'Sequential Selection',      icon:'🎯', step:'Agent #1', desc:'Picks the best single-window clips' },
-  REFINE_PROMPT:             { label:'Sequential Refinement',     icon:'🔧', step:'Agent #3', desc:'Adjusts clip start/end boundaries' },
+  REFINE_PROMPT:             { label:'Sequential Refinement',     icon:'🔧', step:'Agent #3', desc:'Adjusts clip start/end boundaries (1 pass)' },
   NONSEQUENCE_PROMPT:        { label:'Non-Sequential Selection',  icon:'🎬', step:'Agent #2', desc:'Assembles clips from scattered sentences' },
-  REFINE_NONSEQ_PROMPT:      { label:'Non-Sequential Refinement', icon:'🔧', step:'Agent #4', desc:'Improves sentence selection' },
-  SCORER_PROMPT:             { label:'Clip Scorer',               icon:'⭐', step:'Scorer',   desc:'Scores clips on 6 dimensions (0–100)' },
+  REFINE_NONSEQ_PROMPT:      { label:'Non-Sequential Refinement', icon:'🔧', step:'Agent #4', desc:'Scores shorts (0 refinement passes by default)' },
+  SCORER_PROMPT:             { label:'Clip Scorer',               icon:'⭐', step:'Scorer',   desc:'Scores clips on 6 AI dimensions + 1 auto pacing (0–100)' },
   METADATA_PROMPT:           { label:'Metadata Generator',        icon:'📋', step:'Agent #5', desc:'Generates titles + platform recommendations' },
   THUMBNAIL_ART_DIRECTOR_SYSTEM: { label:'Thumbnail Art Director', icon:'🖼️', step:'Stage 6', desc:'Invents the thumbnail creative concept (JSON)' },
   THUMBNAIL_IMAGE_INSTRUCTION:   { label:'Thumbnail Image Brief',  icon:'🎨', step:'Stage 6', desc:'Final instruction sent to the image model' },
 };
 
 function PromptsTab({ prompts, onSave, onReset }) {
-  const [selected,setSelected] = useState('CATEGORY_DETECTION_PROMPT');
+  const [selected,setSelected] = useState('SPEAKER_DETECTION_PROMPT');
   const [draft,setDraft] = useState({});
   const [saving,setSaving] = useState(false);
 
@@ -893,7 +902,7 @@ function OutputTab({ run, videoAvailable }) {
   const result=run?.result;
 
   // Show stage flow even without a result (live during run)
-  if(!result && view !== 'stages') {
+  if(!result && view !== 'stages' && view !== 'all') {
     if (!run) return(
       <div className="p-8 text-center text-gray-600 fade-in">
         <div className="text-5xl mb-4">📭</div>
@@ -950,12 +959,13 @@ function OutputTab({ run, videoAvailable }) {
     <div className="fade-in flex flex-col" style={{height:'calc(100vh - 112px)'}}>
       <div className="flex border-b border-border bg-surface px-6 gap-1 flex-shrink-0 flex-wrap">
         {[
-          {key:'stages',    label:'Stage Flow 🔢'},
-          {key:'summary',   label:'Summary'},
-          {key:'sequential',label:`Sequential (${(result?.sequential_clips||[]).length})`},
+          {key:'stages',       label:'Stage Flow 🔢'},
+          {key:'summary',      label:'Summary'},
+          {key:'all',          label:`All Shorts (${((result?.sequential_clips||[]).length)+((result?.non_sequential_shorts||[]).length)})`},
+          {key:'sequential',   label:`Sequential (${(result?.sequential_clips||[]).length})`},
           {key:'nonsequential',label:`Non-Sequential (${(result?.non_sequential_shorts||[]).length})`},
-          {key:'tokens',    label:'Tokens'},
-          {key:'raw',       label:'Raw JSON'},
+          {key:'tokens',       label:'Tokens'},
+          {key:'raw',          label:'Raw JSON'},
         ].map(t=>(
           <button key={t.key} onClick={()=>setView(t.key)}
             className={`px-4 py-2.5 text-sm transition-all tab-btn ${view===t.key?'active':''}`}>
@@ -1014,6 +1024,95 @@ function OutputTab({ run, videoAvailable }) {
             )}
           </div>
         )}
+
+        {/* ── All Shorts ── */}
+        {view==='all'&&result&&(()=>{
+          const allShorts=[
+            ...seqClips.map(c=>({...c,_type:'sequential',_dur:((c.video_end_time||0)-(c.video_start_time||0)).toFixed(1),_text:c.text})),
+            ...nonSeqShorts.map(s=>({...s,_type:'nonsequential',_dur:(s.total_duration||0).toFixed(1),_text:(s.clips||[]).map(c=>c.text).join(' … ')})),
+          ].sort((a,b)=>(b.confidence_score||0)-(a.confidence_score||0));
+          return(
+            <div className="max-w-3xl space-y-3">
+              <p className="text-xs text-gray-500 mb-4">
+                All {allShorts.length} clips across both pipelines — ranked by score.
+              </p>
+              {allShorts.length===0&&<p className="text-gray-500">No clips generated.</p>}
+              {allShorts.map((item,i)=>{
+                const isSeq=item._type==='sequential';
+                const isPlaying=isSeq
+                  ? playingClip?.video_start_time===item.video_start_time
+                  : playingClip?.short_id===item.short_id;
+                return(
+                  <div key={i} className="rounded-lg border border-border bg-surface clip-card overflow-hidden">
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <span className={`text-xl font-bold flex-shrink-0 w-10 ${scoreColor(item.confidence_score)}`}>{item.confidence_score}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded font-semibold flex-shrink-0 ${isSeq?'bg-violet-900/50 text-violet-300':'bg-teal-900/50 text-teal-300'}`}>
+                        {isSeq?'SEQ':'NON-SEQ'}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-gray-100 truncate">{item.title||'Untitled'}</div>
+                        <div className="text-xs text-gray-400 mt-0.5">
+                          {isSeq
+                            ? <>{item.video_start_time?.toFixed(1)}s – {item.video_end_time?.toFixed(1)}s · {item._dur}s</>
+                            : <>{item._dur}s total · {item.num_clips} segments</>}
+                        </div>
+                      </div>
+                      <div className="flex gap-1 flex-wrap justify-end max-w-[130px]">
+                        {(item.social_media||[]).map(p=>(
+                          <span key={p} className={`text-xs px-1.5 py-0.5 rounded font-medium ${platBadge(p)}`}>{p.replace(' Shorts','').replace(' Reels','')}</span>
+                        ))}
+                      </div>
+                      {videoAvailable&&(
+                        <button
+                          onClick={()=>setPlayingClip(isPlaying?null:isSeq?item:{...item,video_start_time:item.clips?.[0]?.startTime,video_end_time:item.clips?.[item.clips?.length-1]?.endTime})}
+                          className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${isPlaying?'bg-accent text-white':'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}>
+                          {isPlaying?'⏸':'▶'}
+                        </button>
+                      )}
+                    </div>
+                    <div className="px-4 pb-2 text-xs text-gray-400 border-t border-border/40 pt-2">
+                      <span className="text-gray-500">Reason: </span>{item.reason}
+                    </div>
+                    {item._text&&(
+                      <details className="group">
+                        <summary className="px-4 py-1.5 text-xs text-gray-500 hover:text-gray-300 cursor-pointer flex items-center gap-1 select-none border-t border-border/30">
+                          <span className="group-open:rotate-90 transition-transform inline-block text-xs">▶</span>
+                          📝 Transcript
+                          <span className="ml-auto text-gray-600 font-mono">{item._text.split(/\s+/).length} words{!isSeq&&` across ${item.num_clips} segments`}</span>
+                        </summary>
+                        <div className="px-4 pb-3 pt-2">
+                          <div className="bg-gray-900/70 rounded-lg p-3 border border-border/50 max-h-48 overflow-y-auto">
+                            <p className="text-xs text-gray-300 leading-6 whitespace-pre-wrap">{item._text}</p>
+                          </div>
+                        </div>
+                      </details>
+                    )}
+                    {item.score_breakdown&&(
+                      <details className="group">
+                        <summary className="px-4 py-1.5 text-xs text-gray-500 hover:text-gray-300 cursor-pointer flex items-center gap-1 select-none border-t border-border/30">
+                          <span className="group-open:rotate-90 transition-transform inline-block text-xs">▶</span>
+                          ⭐ Score breakdown
+                        </summary>
+                        <div className="px-4 pb-3 pt-2">
+                          <div className="grid grid-cols-3 gap-2">
+                            {Object.entries(item.score_breakdown).map(([dim,s])=>(
+                              <div key={dim} className="bg-gray-900 rounded p-2 text-xs">
+                                <div className="text-gray-500 capitalize">{dim.replace(/_/g,' ')}</div>
+                                <div className={`font-bold ${scoreColor(s*5)}`}>{s}</div>
+                                {item.score_reasoning?.[dim]&&<div className="text-gray-500 text-xs mt-1 leading-4">{item.score_reasoning[dim]}</div>}
+                              </div>
+                            ))}
+                          </div>
+                          {item.weakest_factor&&<p className="text-amber-400 text-xs mt-2">⚠ Weakest: {item.weakest_factor}</p>}
+                        </div>
+                      </details>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {/* ── Sequential ── */}
         {view==='sequential'&&result&&(
