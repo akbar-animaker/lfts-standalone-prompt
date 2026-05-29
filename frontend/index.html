@@ -1100,17 +1100,21 @@ function InlineClipPlayer({ clip, videoUrl }) {
     const idx   = idxRef.current;
     if(!video || !segs[idx] || seekingRef.current) return;
 
-    if(video.currentTime >= segs[idx].end){
+    if(video.currentTime >= segs[idx].end - 0.1){
       seekingRef.current = true;
+      video.muted = true;          // silence immediately — stops audio leak during seek
       if(idx + 1 < segs.length){
         const next = idx + 1;
         idxRef.current = next;
         seekTo(video, segs[next].start);
-        // Release the lock once the seek settles
-        video.addEventListener('seeked', ()=>{ seekingRef.current = false; }, {once:true});
+        video.addEventListener('seeked', ()=>{
+          video.muted = false;     // restore audio only after seek has landed
+          seekingRef.current = false;
+        }, {once:true});
       } else {
         video.pause();
         seekTo(video, segs[idx].end);
+        video.muted = false;
         seekingRef.current = false;
       }
     }
