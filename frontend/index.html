@@ -366,6 +366,63 @@ function ArchitectureTab() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CODE TAB — editable standalone.py with hot-reload
+// ─────────────────────────────────────────────────────────────────────────────
+function CodeTab({ code, onSave, onSaveAndRun, running }) {
+  const [draft, setDraft] = useState(code || '');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { setDraft(code || ''); }, [code]);
+
+  const isDirty = draft !== code;
+
+  const handleSave = async () => {
+    setSaving(true);
+    try { await onSave(draft); } finally { setSaving(false); }
+  };
+
+  const handleSaveAndRun = async () => {
+    setSaving(true);
+    try {
+      await onSave(draft);
+      await onSaveAndRun();
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="flex flex-col fade-in" style={{height:'calc(100vh - 112px)'}}>
+      {/* Toolbar */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-surface flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-semibold text-gray-200 font-mono">standalone.py</span>
+          <span className="text-xs text-gray-500">Pipeline source — edit and run directly</span>
+          {isDirty && <span className="text-xs text-amber-400 font-medium">● unsaved changes</span>}
+        </div>
+        <div className="flex gap-2">
+          <button onClick={handleSave} disabled={!isDirty || saving}
+            className={`px-3 py-1.5 text-xs rounded font-medium transition-colors ${isDirty && !saving ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-gray-800 text-gray-500 cursor-not-allowed'}`}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+          <button onClick={handleSaveAndRun} disabled={saving || running}
+            className={`flex items-center gap-1.5 px-4 py-1.5 text-xs rounded font-semibold transition-colors ${!saving && !running ? 'bg-accent hover:bg-violet-600 text-white shadow shadow-violet-900/40' : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}>
+            {saving ? '⏳ Saving…' : running ? '⏳ Running…' : '▶ Save & Run'}
+          </button>
+        </div>
+      </div>
+      {/* Monaco editor — Python mode */}
+      <div className="flex-1 monaco-wrap" style={{borderRadius:0, border:'none', minHeight:0}}>
+        <MonacoEditor key="code-editor" value={draft} onChange={setDraft} language="python"/>
+      </div>
+      {/* Status bar */}
+      <div className="px-4 py-1.5 border-t border-border bg-surface text-xs text-gray-500 flex justify-between flex-shrink-0">
+        <span>Changes are <span className="text-green-400 font-medium">hot-reloaded</span> — no server restart needed. The next run uses the updated code.</span>
+        <span className="font-mono">{draft.split('\n').length.toLocaleString()} lines · {draft.length.toLocaleString()} chars</span>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // PROMPTS TAB — ordered to match pipeline flow
 // ─────────────────────────────────────────────────────────────────────────────
 const PROMPT_LABELS = {
@@ -1380,6 +1437,7 @@ function App() {
   const [run,setRun]=useState(null);
   const [status,setStatus]=useState(null);
   const [videoAvailable,setVideoAvailable]=useState(false);
+  const [code,setCode]=useState('');
   const [toast,setToast]=useState(null);
   const sseRef=useRef(null);
 
@@ -1388,11 +1446,12 @@ function App() {
   useEffect(()=>{
     Promise.all([
       api.get('/prompts'),api.get('/config'),api.get('/config/schema'),
-      api.get('/versions'),api.get('/status'),api.get('/video/info'),
-    ]).then(([p,c,s,v,st,vi])=>{
+      api.get('/versions'),api.get('/status'),api.get('/video/info'),api.get('/code'),
+    ]).then(([p,c,s,v,st,vi,cd])=>{
       setPrompts(p);setConfig(c);setSchema(s);
       setVersions(v.versions||[]);setStatus(st);
       setVideoAvailable(vi.exists||false);
+      setCode(cd.content||'');
     }).catch(e=>showToast('Backend connection failed: '+e.message,'error'));
     const iv=setInterval(()=>{
       api.get('/status').then(setStatus).catch(()=>{});
@@ -1438,6 +1497,12 @@ function App() {
     }
   };
 
+  const handleSaveCode=async(content)=>{
+    const r=await api.put('/code',{content});
+    setCode(content);
+    if(r.reload_warning) showToast('Code saved — reload warning: '+r.reload_warning,'error');
+    else showToast('Code saved & hot-reloaded ✓','success');
+  };
   const handleSavePrompts=async(u)=>{ const r=await api.put('/prompts',u);setPrompts(r);showToast('Prompt saved!','success'); };
   const handleResetPrompt=async(n)=>{ const {value}=await api.post(`/prompts/${n}/reset`);setPrompts(p=>({...p,[n]:value}));showToast('Reset to default.','info');return value; };
   const handleSaveConfig=async(u)=>{ const r=await api.put('/config',u);setConfig(r);showToast('Config saved!','success'); };
@@ -1448,12 +1513,13 @@ function App() {
 
   const tabs=[
     {key:'architecture',label:'Architecture',icon:'🏗️'},
-    {key:'prompts',label:'Prompts',icon:'✏️'},
-    {key:'config',label:'Config',icon:'⚙️'},
-    {key:'logs',label:'Logs',icon:'📋',badge:run?.status==='running'?'●':null},
-    {key:'output',label:'Output',icon:'📊',badge:run?.result?(run.result.sequential_clips?.length||0)+(run.result.non_sequential_shorts?.length||0):null},
-    {key:'versions',label:'Versions',icon:'🕐',badge:versions.length||null},
-    {key:'export',label:'Export',icon:'📤'},
+    {key:'code',        label:'Code',         icon:'💻'},
+    {key:'prompts',     label:'Prompts',      icon:'✏️'},
+    {key:'config',      label:'Config',       icon:'⚙️'},
+    {key:'logs',        label:'Logs',         icon:'📋',badge:run?.status==='running'?'●':null},
+    {key:'output',      label:'Output',       icon:'📊',badge:run?.result?(run.result.sequential_clips?.length||0)+(run.result.non_sequential_shorts?.length||0):null},
+    {key:'versions',    label:'Versions',     icon:'🕐',badge:versions.length||null},
+    {key:'export',      label:'Export',       icon:'📤'},
   ];
 
   return(
@@ -1511,6 +1577,7 @@ function App() {
       <main className="flex-1 overflow-hidden">
         <div className="h-full overflow-y-auto">
           {activeTab==='architecture'&&<div style={{height:'calc(100vh - 112px)'}}><ArchitectureTab/></div>}
+          {activeTab==='code'&&<CodeTab code={code} onSave={handleSaveCode} onSaveAndRun={()=>handleStartRun(config.CLIP_MODE||'both',false)} running={run?.status==='running'}/>}
           {activeTab==='prompts'&&<PromptsTab prompts={prompts} onSave={handleSavePrompts} onReset={handleResetPrompt}/>}
           {activeTab==='config'&&<ConfigTab config={config} schema={schema} onSave={handleSaveConfig} onReset={handleResetConfig}/>}
           {activeTab==='logs'&&<LogsTab run={run} onStartRun={handleStartRun} status={status}/>}
