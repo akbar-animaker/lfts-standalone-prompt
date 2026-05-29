@@ -2,7 +2,7 @@
 Resolve a project ID via the transcribe API, then download the transcript and
 video to local storage so the existing pipeline can run on them.
 
-API:  GET https://snbx.vmakerdev.com/lstsf/transcribe/<project_id>/
+API:  POST https://snbx.vmakerdev.com/lstsf/transcribe/   body: {"projectId": "<id>"}
 Success → {"status":"success","data":{"video_url":..., "transcribe_url":...}}
 Failure → {"status":"error","message":"..."}
 """
@@ -42,8 +42,12 @@ def _safe_id(pid: str) -> str:
     return cleaned or "project"
 
 
-def _http_get_json(url: str):
-    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+def _http_post_json(url: str, payload: dict):
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url, data=data, method="POST",
+        headers={"Accept": "application/json", "Content-Type": "application/json"},
+    )
     with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
@@ -101,10 +105,10 @@ def fetch_project(project_id: str) -> dict:
     if not project_id:
         raise RuntimeError("Project ID is required")
 
-    api_url = f"{API_BASE}/{urllib.parse.quote(project_id)}/"
-    log.info(f"[PROJECT] Resolving '{project_id}' via {api_url}")
+    api_url = f"{API_BASE}/"
+    log.info(f"[PROJECT] Resolving '{project_id}' via POST {api_url}")
     try:
-        payload = _http_get_json(api_url)
+        payload = _http_post_json(api_url, {"projectId": project_id})
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"Transcribe API returned HTTP {e.code} for project '{project_id}'")
     except urllib.error.URLError as e:
