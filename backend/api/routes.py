@@ -42,12 +42,13 @@ def reset_prompt(name: str):
 @router.get("/config")
 def get_config():
     cfg = storage.get_config()
-    # Mask API key for display
-    key = cfg.get("CLAUDE_API_KEY") or ""
-    if len(key) > 12:
-        cfg["CLAUDE_API_KEY"] = key[:8] + "..." + key[-4:]
-    elif key:
-        cfg["CLAUDE_API_KEY"] = "***"
+    # Mask API keys for display
+    for key_name in ("CLAUDE_API_KEY", "OPENAI_API_KEY"):
+        key = cfg.get(key_name) or ""
+        if len(key) > 12:
+            cfg[key_name] = key[:8] + "..." + key[-4:]
+        elif key:
+            cfg[key_name] = "***"
     return cfg
 
 

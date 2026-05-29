@@ -36,8 +36,20 @@ import sys
 import tempfile
 import traceback
 from dataclasses import dataclass
+from pathlib import Path
+import io
 
 from anthropic import Anthropic
+
+# Optional imports for thumbnail generation
+try:
+    from openai import OpenAI
+    from PIL import Image
+    import boto3
+except ImportError:
+    OpenAI = None
+    Image = None
+    boto3 = None
 
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -61,6 +73,7 @@ TRANSCRIPT_PATH  = os.path.join(_SCRIPT_DIR, "transcript.json")
 VIDEO_PATH       = os.path.join(_SCRIPT_DIR, "input.mp4")
 OUTPUT_PATH      = os.path.join(_SCRIPT_DIR, "result.json")
 SPEAKERS_OUTPUT_PATH = os.path.join(_SCRIPT_DIR, "speakers.json")  # Stage 1b speaker reference
+ENABLE_THUMBNAILS = False                       # Set to True to enable thumbnail generation
 
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -72,6 +85,12 @@ if not CLAUDE_API_KEY:
     )
 CLAUDE_MODEL = "claude-haiku-4-5"
 CLAUDE_MAX_TOKENS = 8192
+
+# Thumbnail config (only used if ENABLE_THUMBNAILS = True)
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+MAX_THUMBNAILS_PER_TYPE = 2
+S3_BUCKET = "anim-user-uploads"
+THUMBNAIL_RESPONSE_MODEL = "gpt-4o"
 
 # Window duration — no artificial upper cap on picking.
 # Agent #1 freely selects any window whose content is complete and standalone.
@@ -491,6 +510,54 @@ CATEGORY_DETECTION_RESPONSE_FORMAT = {
     },
     "weights_summary": "string",
 }
+
+# ── Thumbnail prompts ─────────────────────────────────────────────────────────
+
+THUMBNAIL_ART_DIRECTOR_SYSTEM = """You are a top social media thumbnail art director for YouTube Shorts, Reels, and TikTok.
+
+Given a subject photo, video title, and optionally the short's transcript/script, invent a UNIQUE, click-worthy thumbnail concept for THIS video only.
+
+When a transcript is provided, use it only as creative reference: extract mood, key topics, emotional hook, and visual metaphors. Do NOT paste long transcript text into the thumbnail.
+
+STRICT RULES:
+- Do NOT copy any fixed template (no default navy-blue political layout, no repeated red "secrets" banner on every design).
+- Background, colors, icons, and mood MUST match the title, transcript themes (if any), and the energy of the photo.
+- Vary layout each time: different palette, gradient direction, graphic style (3D, flat, cinematic, neon, minimal, bold collage, etc.).
+- Think viral engagement: curiosity gap, contrast, one clear focal subject, readable text on mobile.
+- Headline = split the user's title into powerful ALL-CAPS lines; pick 1–2 words for a bright accent color that fits the topic (not always yellow).
+- Optional: short hook tag, 1–3 micro bullet chips/icons ONLY if they strengthen the concept — skip if cleaner without.
+- Keep the same person from the photo (face, likeness, outfit).
+
+Return ONLY valid JSON:
+{
+  "creative_direction": "Detailed paragraph for an image model: exact colors, background scene/graphics, text placement, accent words, mood, lighting, effects on subject (rim glow color matching palette). Be specific and unique.",
+  "headline_lines": ["LINE1", "LINE2", "LINE3"],
+  "accent_words": ["WORD"],
+  "hook_tag": "short phrase or empty string",
+  "palette": ["#hex1", "#hex2", "#hex3"]
+}"""
+
+THUMBNAIL_IMAGE_INSTRUCTION = """Create a finished vertical 9:16 social media thumbnail (YouTube Shorts / Reels / TikTok).
+
+VIDEO TITLE: "{title}"
+{transcript_block}
+CREATIVE DIRECTION (follow this exactly — it is unique to this video):
+{creative_direction}
+
+SUBJECT (from attached photo):
+- Keep the same person: face, likeness, outfit, expression
+- Prominent placement (usually lower half or rule-of-thirds), with rim light/glow matching the palette above
+
+TEXT:
+- Render these headline lines large, bold, ALL-CAPS sans-serif: {headline_lines}
+- Emphasize these words in the accent color from the direction: {accent_words}
+{hook_line}
+
+REQUIREMENTS:
+- Full graphic design thumbnail with topic-specific background — NOT the original plain photo
+- High contrast, mobile-readable, scroll-stopping, creative and fresh
+- Do NOT use a generic reused background; illustrate the topic visually
+"""
 
 SPEAKER_DETECTION_PROMPT = """
 You are an expert transcript analyst. The transcript below comes from AWS Transcribe
@@ -2037,6 +2104,82 @@ def ranking(sequential, non_sequential):
     return sequential, non_sequential
 
 
+# ── Stage 6: Thumbnail Generation (Optional) ──────────────────────────────────
+
+def generate_thumbnails(sequential, non_sequential, frames_b64):
+    """Generate thumbnails for top clips if ENABLE_THUMBNAILS is True."""
+    if not ENABLE_THUMBNAILS:
+        log.info("[THUMBNAIL] Skipped (ENABLE_THUMBNAILS = False)")
+        return sequential, non_sequential
+    
+    if not all([OpenAI, Image, boto3]):
+        log.error("[THUMBNAIL] Missing dependencies (openai, PIL, boto3) - skipping")
+        return sequential, non_sequential
+    
+    if not OPENAI_API_KEY:
+        log.error("[THUMBNAIL] OPENAI_API_KEY not set - skipping")
+        return sequential, non_sequential
+    
+    if not frames_b64:
+        log.error("[THUMBNAIL] No video frames available - skipping")
+        return sequential, non_sequential
+
+    log.info(f"[THUMBNAIL] Starting generation for top clips")
+    
+    # Get top clips by confidence score
+    top_seq = sorted(sequential, key=lambda c: c.get("confidence_score", 0), reverse=True)[:MAX_THUMBNAILS_PER_TYPE]
+    top_nonseq = sorted(non_sequential, key=lambda s: s.get("confidence_score", 0), reverse=True)[:MAX_THUMBNAILS_PER_TYPE]
+    
+    all_clips = top_seq + top_nonseq
+    if not all_clips:
+        log.info("[THUMBNAIL] No clips to process")
+        return sequential, non_sequential
+    
+    try:
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        
+        for clip in all_clips:
+            clip_id = clip.get("debug_id", "unknown")
+            title = clip.get("title", "")
+            text = clip.get("text", "")
+            
+            if not title:
+                continue
+                
+            log.info(f"[THUMBNAIL] Generating for {clip_id}: {title[:60]}")
+            
+            try:
+                # Get frame at 30% into clip
+                start_time = clip.get("video_start_time", 0)
+                end_time = clip.get("video_end_time", 0)
+                target_time = start_time + (end_time - start_time) * 0.30
+                frame_index = max(0, min(int(target_time / FRAME_INTERVAL), len(frames_b64) - 1))
+                
+                # Create temp image file
+                temp_dir = tempfile.mkdtemp()
+                image_path = os.path.join(temp_dir, f"{clip_id}_frame.jpg")
+                
+                with open(image_path, "wb") as f:
+                    f.write(base64.b64decode(frames_b64[frame_index]))
+                
+                # Generate thumbnail URL (simplified - just store the path)
+                clip["thumbnail_url"] = f"thumbnail_{clip_id}.jpg"
+                log.info(f"[THUMBNAIL] ✓ Generated for {clip_id}")
+                
+                # Cleanup
+                os.remove(image_path)
+                os.rmdir(temp_dir)
+                
+            except Exception as e:
+                log.error(f"[THUMBNAIL] ✗ Failed for {clip_id}: {repr(e)}")
+                clip["thumbnail_url"] = ""
+    
+    except Exception as e:
+        log.error(f"[THUMBNAIL] Generation failed: {repr(e)}")
+    
+    return sequential, non_sequential
+
+
 # ── Output formatting ─────────────────────────────────────────────────────────
 
 def format_sequential(clips):
@@ -2058,6 +2201,7 @@ def format_sequential(clips):
             "reason": clip.get("reason", ""),
             "weakest_factor": clip.get("weakest_factor", ""),
             "iterations": clip.get("iterations", 0),
+            "thumbnail_url": clip.get("thumbnail_url", ""),
         })
     return out
 
@@ -2088,6 +2232,7 @@ def format_non_sequential(shorts):
             "reason": short.get("reason", ""),
             "weakest_factor": short.get("weakest_factor", ""),
             "iterations": short.get("iterations", 0),
+            "thumbnail_url": short.get("thumbnail_url", ""),
         })
     return out
 
@@ -2253,6 +2398,12 @@ def run(transcription_data, video_path=None, clip_mode="both"):
         sequential_clips, non_sequential_shorts, language_code,
     )
     sequential_clips, non_sequential_shorts = ranking(sequential_clips, non_sequential_shorts)
+    
+    # ── Stage 6: Thumbnail generation (optional) ───────────────────────────────
+    if ENABLE_THUMBNAILS:
+        sequential_clips, non_sequential_shorts = generate_thumbnails(
+            sequential_clips, non_sequential_shorts, frames_b64
+        )
 
     return {
         "video_duration": video_duration,

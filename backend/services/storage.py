@@ -33,6 +33,8 @@ PROMPT_NAMES = [
     "METADATA_PROMPT",
     "CATEGORY_DETECTION_PROMPT",
     "SPEAKER_DETECTION_PROMPT",
+    "THUMBNAIL_ART_DIRECTOR_SYSTEM",
+    "THUMBNAIL_IMAGE_INSTRUCTION",
 ]
 
 # ── Config keys exposed in the UI (key → (type, label, group)) ────────────────
@@ -56,7 +58,21 @@ CONFIG_SCHEMA = {
     "TRANSCRIPT_PATH":              (str,   "Transcript Path",          "Files"),
     "VIDEO_PATH":                   (str,   "Video Path",               "Files"),
     "OUTPUT_PATH":                  (str,   "Output Path",              "Files"),
+    "ENABLE_THUMBNAILS":            (bool,  "Enable Thumbnails",        "Thumbnails"),
+    "OPENAI_API_KEY":               (str,   "OpenAI API Key",           "Thumbnails"),
+    "THUMBNAIL_RESPONSE_MODEL":     (str,   "Thumbnail Model",          "Thumbnails"),
+    "MAX_THUMBNAILS_PER_TYPE":      (int,   "Max Thumbnails Per Type",  "Thumbnails"),
+    "S3_BUCKET":                    (str,   "S3 Bucket",                "Thumbnails"),
 }
+
+
+def _cast_bool(v: Any) -> bool:
+    """Coerce UI values ("true"/"false", 0/1, bool) into a real bool."""
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, str):
+        return v.strip().lower() in ("1", "true", "yes", "on")
+    return bool(v)
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -140,7 +156,10 @@ def save_config(updates: Dict[str, Any]) -> Dict[str, Any]:
             if k in CONFIG_SCHEMA:
                 cast_fn = CONFIG_SCHEMA[k][0]
                 try:
-                    current[k] = cast_fn(v) if v not in (None, "") else v
+                    if cast_fn is bool:
+                        current[k] = _cast_bool(v)
+                    else:
+                        current[k] = cast_fn(v) if v not in (None, "") else v
                 except (ValueError, TypeError):
                     current[k] = v
         _write_json(CONFIG_FILE, current)

@@ -188,6 +188,19 @@ const STAGE_DETAILS = {
     outputs:['Ordered sequential_clips (by video position)','Ordered non_sequential_shorts (by confidence score)'],
     params:[],
   },
+  thumb:{
+    icon:'🖼️',title:'Stage 6 — Thumbnails',step:'Stage 6',color:'#3a1f3b',
+    tagline:'Optional — designs click-worthy thumbnails for the top clips',
+    nontech:"Off by default. When ENABLE_THUMBNAILS is turned on (Config tab), the system takes the highest-scoring clips and designs a social-media thumbnail for each:\n\n1. An \"art director\" prompt invents a unique creative concept for the clip — headline lines, accent colors, palette, and mood — tailored to its title and transcript.\n2. A frame grabbed ~30% of the way into the clip is used as the subject photo.\n3. An image model renders the finished 9:16 thumbnail, which is then uploaded to S3.\n\nEach processed clip gets a thumbnail_url in the output. Requires an OpenAI API key and the openai/Pillow/boto3 packages installed.",
+    inputs:['Top clips by confidence score (per type)','Extracted video frames'],
+    outputs:['thumbnail_url on each processed clip'],
+    params:[
+      {k:'ENABLE_THUMBNAILS',v:'Master on/off toggle (default off)'},
+      {k:'MAX_THUMBNAILS_PER_TYPE',v:'How many top clips per type get a thumbnail'},
+      {k:'THUMBNAIL_RESPONSE_MODEL',v:'Vision/image model used for the concept'},
+      {k:'OPENAI_API_KEY / S3_BUCKET',v:'Credentials + upload destination'},
+    ],
+  },
   output:{
     icon:'📄',title:'Output Files',step:'Done',color:'#1a3322',
     tagline:'Final deliverable — a JSON file with every clip ready to cut',
@@ -207,14 +220,15 @@ function ArchitectureTab() {
     {id:'a1',   color:'#3b2d5f'},{id:'a3', color:'#3b2d5f'},
     {id:'a2',   color:'#1f3b3b'},{id:'a4', color:'#1f3b3b'},
     {id:'scorer',color:'#2d1f4a'},
-    {id:'a5',   color:'#3b2d1f'},{id:'rank',color:'#1e3a1e'},{id:'output',color:'#1a3322'},
+    {id:'a5',   color:'#3b2d1f'},{id:'rank',color:'#1e3a1e'},
+    {id:'thumb',color:'#3a1f3b'},{id:'output',color:'#1a3322'},
   ];
 
   const grid = [
     // [id, col, row]
     ['input',0,0],['s0',1,0],['s1',2,0],['s1b',3,0],['s2',4,0],
     ['a1',1,1],['a3',2,1],['a2',3,1],['a4',4,1],
-    ['scorer',0,2],['a5',1,2],['rank',2,2],['output',3,2],
+    ['scorer',0,2],['a5',1,2],['rank',2,2],['thumb',3,2],['output',4,2],
   ];
 
   const W=128,H=72,GX=22,GY=18,PX=18,PY=16;
@@ -231,7 +245,7 @@ function ArchitectureTab() {
     ['s2','a2'],['a2','a4'],
     ['a3','a5'],['a4','a5'],
     ['scorer','a3'],['scorer','a4'],
-    ['a5','rank'],['rank','output'],
+    ['a5','rank'],['rank','thumb'],['thumb','output'],
   ];
 
   const det = sel ? STAGE_DETAILS[sel] : null;
@@ -284,6 +298,7 @@ function ArchitectureTab() {
             {color:'#1f3b3b',label:'Non-sequential agents'},
             {color:'#2d1f4a',label:'Scorer'},
             {color:'#3b2d1f',label:'Metadata + Ranking'},
+            {color:'#3a1f3b',label:'Thumbnails (optional)'},
           ].map(i=>(
             <div key={i.label} className="flex items-center gap-1.5 text-xs text-gray-400">
               <div className="w-3 h-3 rounded" style={{background:i.color,border:'1px solid #4b5563'}}/>
@@ -362,6 +377,8 @@ const PROMPT_LABELS = {
   REFINE_NONSEQ_PROMPT:      { label:'Non-Sequential Refinement', icon:'🔧', step:'Agent #4', desc:'Improves sentence selection' },
   SCORER_PROMPT:             { label:'Clip Scorer',               icon:'⭐', step:'Scorer',   desc:'Scores clips on 6 dimensions (0–100)' },
   METADATA_PROMPT:           { label:'Metadata Generator',        icon:'📋', step:'Agent #5', desc:'Generates titles + platform recommendations' },
+  THUMBNAIL_ART_DIRECTOR_SYSTEM: { label:'Thumbnail Art Director', icon:'🖼️', step:'Stage 6', desc:'Invents the thumbnail creative concept (JSON)' },
+  THUMBNAIL_IMAGE_INSTRUCTION:   { label:'Thumbnail Image Brief',  icon:'🎨', step:'Stage 6', desc:'Final instruction sent to the image model' },
 };
 
 function PromptsTab({ prompts, onSave, onReset }) {
@@ -435,6 +452,9 @@ function PromptsTab({ prompts, onSave, onReset }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIG TAB
 // ─────────────────────────────────────────────────────────────────────────────
+// Coerce config values (real bools, or "true"/"false" strings from storage) to a JS bool.
+const _cfgBool = v => v===true || v==='true' || v===1 || v==='1';
+
 function ConfigTab({ config, schema, onSave, onReset }) {
   const [draft,setDraft]=useState({});
   const [saving,setSaving]=useState(false);
@@ -446,9 +466,19 @@ function ConfigTab({ config, schema, onSave, onReset }) {
     groups[meta.group].push({key,...meta});
   });
   const isDirty=Object.keys(draft).some(k=>String(draft[k])!==String(config[k]));
-  const handleSave=async()=>{setSaving(true);try{await onSave(draft);}finally{setSaving(false);}};
-  const gi={'Model':'🤖','Pipeline':'⚙️','Scoring':'⭐','Refinement':'🔧','Video':'🎬','Files':'📂'};
-  debugger;
+  const handleSave=async()=>{
+    setSaving(true);
+    try{
+      // Don't persist masked API keys (e.g. "sk-ant-a...x4f2") back over the real stored value.
+      const payload={...draft};
+      ['CLAUDE_API_KEY','OPENAI_API_KEY'].forEach(k=>{
+        const v=payload[k];
+        if(typeof v==='string'&&(v.includes('...')||v==='***'))delete payload[k];
+      });
+      await onSave(payload);
+    }finally{setSaving(false);}
+  };
+  const gi={'Model':'🤖','Pipeline':'⚙️','Scoring':'⭐','Refinement':'🔧','Video':'🎬','Files':'📂','Thumbnails':'🖼️'};
   return(
     <div className="p-6 fade-in max-w-3xl">
       <div className="flex items-center justify-between mb-6">
@@ -474,9 +504,18 @@ function ConfigTab({ config, schema, onSave, onReset }) {
                 <label className="block text-xs font-medium text-gray-400 mb-1">
                   {label}{String(draft[key])!==String(config[key])&&<span className="ml-1 text-amber-400">●</span>}
                 </label>
-                {key==='CLAUDE_API_KEY'?(
+                {type==='bool'?(
+                  <button type="button" role="switch" aria-checked={_cfgBool(draft[key])}
+                    onClick={()=>setDraft(d=>({...d,[key]:!_cfgBool(d[key])}))}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${_cfgBool(draft[key])?'bg-accent':'bg-gray-700'}`}>
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${_cfgBool(draft[key])?'translate-x-6':'translate-x-1'}`}/>
+                  </button>
+                ):key==='CLAUDE_API_KEY'?(
                   <input type="password" className="w-full bg-gray-900 border border-border rounded px-3 py-1.5 text-sm font-mono text-gray-200 outline-none focus:border-accent"
                     value={draft[key]||''} onChange={e=>setDraft(d=>({...d,[key]:e.target.value}))} placeholder="sk-ant-..."/>
+                ):key==='OPENAI_API_KEY'?(
+                  <input type="password" className="w-full bg-gray-900 border border-border rounded px-3 py-1.5 text-sm font-mono text-gray-200 outline-none focus:border-accent"
+                    value={draft[key]||''} onChange={e=>setDraft(d=>({...d,[key]:e.target.value}))} placeholder="sk-..."/>
                 ):key==='CLIP_MODE'?(
                   <select className="w-full bg-gray-900 border border-border rounded px-3 py-1.5 text-sm text-gray-200 outline-none focus:border-accent"
                     value={draft[key]||'both'} onChange={e=>setDraft(d=>({...d,[key]:e.target.value}))}>
