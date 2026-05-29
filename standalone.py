@@ -78,11 +78,6 @@ ENABLE_THUMBNAILS = False                       # Set to True to enable thumbnai
 
 # ── Config ────────────────────────────────────────────────────────────────────
 CLAUDE_API_KEY = os.environ.get("CLAUDE_API_KEY", "")
-if not CLAUDE_API_KEY:
-    raise RuntimeError(
-        "CLAUDE_API_KEY environment variable is not set. "
-        "Export it before running, e.g. `export CLAUDE_API_KEY=sk-ant-...`."
-    )
 CLAUDE_MODEL = "claude-haiku-4-5"
 CLAUDE_MAX_TOKENS = 8192
 
