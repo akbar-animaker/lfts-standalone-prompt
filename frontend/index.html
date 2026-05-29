@@ -1059,48 +1059,87 @@ function StageFlowTable({ run }) {
 // INLINE CLIP PLAYER (used inside ClipDetailPanel)
 // ─────────────────────────────────────────────────────────────────────────────
 function InlineClipPlayer({ clip, videoUrl }) {
-  const videoRef = useRef(null);
-  const startTime = clip?.video_start_time ?? 0;
-  const endTime   = clip?.video_end_time   ?? Infinity;
-  const endRef    = useRef(endTime);
+  const videoRef  = useRef(null);
+  const segsRef   = useRef([]);   // [{start, end}, ...]
+  const idxRef    = useRef(0);    // which segment we're currently playing
+  const [segIdx, setSegIdx] = useState(0); // for UI badge
 
-  // Keep endRef current so timeupdate handler always has latest value
-  useEffect(()=>{ endRef.current = endTime; });
+  // Build the segments list from the clip object.
+  // Clips with _play_segments get multi-segment walk-through.
+  // Sequential (or single-segment overrides) just have one entry.
+  const buildSegs = (c) => {
+    if(c?._play_segments && c._play_segments.length > 0) return c._play_segments;
+    const s = c?.video_start_time ?? 0;
+    const e = c?.video_end_time   ?? Infinity;
+    return [{ start: s, end: e }];
+  };
 
-  // Seek to clip start whenever the start time changes or the video src loads
+  const seekTo = (video, time) => { try{ video.currentTime = time; }catch(ex){} };
+
+  // Reset and seek to segment 0 whenever the clip changes
   useEffect(()=>{
+    const segs = buildSegs(clip);
+    segsRef.current = segs;
+    idxRef.current  = 0;
+    setSegIdx(0);
     const video = videoRef.current;
-    if(!video) return;
-    const doSeek = ()=>{ try{ video.currentTime = startTime; }catch(e){} };
-    // readyState >= 1 means HAVE_METADATA — we can seek immediately
-    if(video.readyState >= 1){
-      doSeek();
-    } else {
+    if(!video || segs.length === 0) return;
+    const doSeek = ()=> seekTo(video, segs[0].start);
+    if(video.readyState >= 1){ doSeek(); }
+    else {
       video.addEventListener('loadedmetadata', doSeek, {once:true});
-      return ()=>video.removeEventListener('loadedmetadata', doSeek);
+      return ()=> video.removeEventListener('loadedmetadata', doSeek);
     }
-  },[startTime, videoUrl]);
+  },[clip, videoUrl]);   // eslint-disable-line
 
   const handleLoadedMetadata = ()=>{
-    try{ videoRef.current.currentTime = startTime; }catch(e){}
+    const segs = segsRef.current;
+    if(segs.length > 0) seekTo(videoRef.current, segs[0].start);
   };
 
   const handleTimeUpdate = ()=>{
     const video = videoRef.current;
-    const end   = endRef.current;
-    if(video && end < Infinity && video.currentTime >= end){
-      video.pause();
-      // snap back to end boundary so scrubber looks clean
-      try{ video.currentTime = end; }catch(e){}
+    const segs  = segsRef.current;
+    const idx   = idxRef.current;
+    if(!video || !segs[idx]) return;
+
+    if(video.currentTime >= segs[idx].end - 0.05){
+      if(idx + 1 < segs.length){
+        // Jump to next segment
+        const next = idx + 1;
+        idxRef.current = next;
+        setSegIdx(next);
+        seekTo(video, segs[next].start);
+        // keep playing — don't pause
+      } else {
+        // All segments done
+        video.pause();
+        seekTo(video, segs[idx].end);
+      }
     }
   };
 
+  const segs = buildSegs(clip);
+  const isMulti = segs.length > 1;
+
   return(
-    <video ref={videoRef} src={videoUrl}
-      onLoadedMetadata={handleLoadedMetadata}
-      onTimeUpdate={handleTimeUpdate}
-      controls
-      className="w-full block" style={{maxHeight:'190px',background:'#000'}}/>
+    <div className="relative bg-black">
+      <video ref={videoRef} src={videoUrl}
+        onLoadedMetadata={handleLoadedMetadata}
+        onTimeUpdate={handleTimeUpdate}
+        controls
+        className="w-full block" style={{maxHeight:'190px'}}/>
+      {isMulti&&(
+        <div className="absolute top-2 right-2 flex gap-1">
+          {segs.map((s,i)=>(
+            <button key={i} onClick={()=>{ idxRef.current=i; setSegIdx(i); seekTo(videoRef.current,s.start); }}
+              className={`text-xs px-1.5 py-0.5 rounded font-mono transition-all ${i===segIdx?'bg-violet-600 text-white':'bg-black/60 text-gray-400 hover:bg-violet-900/60 hover:text-violet-300'}`}>
+              S{i+1}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1456,10 +1495,14 @@ function OutputTab({ run, videoAvailable }) {
                 const isSel=isSeq
                   ? selectedClip?.video_start_time===item.video_start_time
                   : selectedClip?.short_id===item.short_id;
-                // For non-seq, attach first-segment times
+                // For non-seq, attach all segments for walk-through playback
                 const clipForPanel = isSeq ? item : {...item,
                   video_start_time: item.clips?.[0]?.startTime ?? item.clips?.[0]?.start_time,
                   video_end_time:   item.clips?.[0]?.endTime   ?? item.clips?.[0]?.end_time,
+                  _play_segments: (item.clips||[]).map(c=>({
+                    start: c.startTime ?? c.start_time ?? 0,
+                    end:   c.endTime   ?? c.end_time   ?? 0,
+                  })).filter(s=>s.end > s.start),
                 };
                 return(
                   <div key={i} onClick={()=>setSelectedClip(clipForPanel)} className={`rounded-lg border bg-surface clip-card overflow-hidden cursor-pointer transition-all ${isSel?'border-accent ring-1 ring-accent/40':'border-border hover:border-gray-600'}`}>
@@ -1625,10 +1668,14 @@ function OutputTab({ run, videoAvailable }) {
             ):(
               sortNonSeq(nonSeqShorts).map((short,i)=>{
                 const isSel=selectedClip?.short_id===short.short_id;
-                // Attach first-segment times so the video player can seek
+                // Build all segments for multi-segment walk-through playback
                 const nsWithTimes={...short,
                   video_start_time: short.clips?.[0]?.startTime ?? short.clips?.[0]?.start_time,
                   video_end_time:   short.clips?.[0]?.endTime   ?? short.clips?.[0]?.end_time,
+                  _play_segments: (short.clips||[]).map(c=>({
+                    start: c.startTime ?? c.start_time ?? 0,
+                    end:   c.endTime   ?? c.end_time   ?? 0,
+                  })).filter(s=>s.end > s.start),
                 };
                 return(
                   <div key={i} onClick={()=>setSelectedClip(nsWithTimes)} className={`rounded-lg border bg-surface clip-card overflow-hidden cursor-pointer transition-all ${isSel?'border-accent ring-1 ring-accent/40':'border-border hover:border-gray-600'}`}>
@@ -1674,7 +1721,7 @@ function OutputTab({ run, videoAvailable }) {
                                   <span className="text-xs font-mono text-gray-500">
                                     {(c.startTime??c.start_time??0).toFixed(1)}s – {(c.endTime??c.end_time??0).toFixed(1)}s
                                     {runVideoAvailable&&(
-                                      <button onClick={e=>{e.stopPropagation();setSelectedClip({...short,video_start_time:c.startTime??c.start_time,video_end_time:c.endTime??c.end_time,title:`${short.title||''} — Seg ${j+1}`});}}
+                                      <button onClick={e=>{e.stopPropagation();const st=c.startTime??c.start_time??0,en=c.endTime??c.end_time??0;setSelectedClip({...short,video_start_time:st,video_end_time:en,title:`${short.title||''} — Seg ${j+1}`,_play_segments:[{start:st,end:en}]});}}
                                         className="ml-2 text-violet-400 hover:text-violet-300">▶</button>
                                     )}
                                   </span>
@@ -1702,7 +1749,7 @@ function OutputTab({ run, videoAvailable }) {
                                 <span className="font-mono text-violet-300">{(c.startTime??c.start_time??0).toFixed(1)}s – {(c.endTime??c.end_time??0).toFixed(1)}s</span>
                                 <span className="text-gray-500">({(c.duration??0).toFixed(1)}s)</span>
                                 {runVideoAvailable&&(
-                                  <button onClick={e=>{e.stopPropagation();setSelectedClip({...short,video_start_time:c.startTime??c.start_time,video_end_time:c.endTime??c.end_time,title:`${short.title||''} — Segment ${j+1}`});}}
+                                  <button onClick={e=>{e.stopPropagation();const st=c.startTime??c.start_time??0,en=c.endTime??c.end_time??0;setSelectedClip({...short,video_start_time:st,video_end_time:en,title:`${short.title||''} — Segment ${j+1}`,_play_segments:[{start:st,end:en}]});}}
                                     className="text-violet-400 hover:text-violet-300 text-xs">▶ play</button>
                                 )}
                               </div>
