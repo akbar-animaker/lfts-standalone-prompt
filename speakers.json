@@ -1,1861 +1,1012 @@
 {
   "source": "Stage 1b — LLM speaker detection (sentence-level assignment)",
-  "note": "This is a conference presentation by the CEO of Animaker with embedded video clips featuring a quoted AI researcher, a customer service role-play scenario, a training avatar character, and dubbed speech samples.",
-  "total_speakers": 5,
+  "note": "This is a conference presentation where a moderator introduces Colonel David Devasahayam, who delivers an extended personal testimony, followed by brief closing remarks from the moderator.",
+  "total_speakers": 3,
   "speakers": [
     {
       "id": "Person_1",
-      "name": "Animaker CEO",
-      "role": "Main presenter and session host",
-      "context": "Introduces himself as CEO of Animaker at S35, guides the entire presentation with consistent tone and perspective throughout, introduces topics and transitions between slides.",
-      "total_duration": 1341.58,
-      "sentence_count": 215,
+      "name": "Moderator / Event Host",
+      "role": "Conference moderator and master of ceremonies",
+      "context": "Identified by opening remarks introducing Colonel David, reading his biography, inviting him to stage, and closing remarks after his speech. Uses phrases like 'let me tell you' and 'put your hands together.'",
+      "total_duration": 80.26,
+      "sentence_count": 13,
       "segments": [
         {
-          "start_sentence_index": 1,
-          "end_sentence_index": 9,
-          "start_time": 0.08,
-          "end_time": 39.82,
-          "duration": 39.74
+          "start_sentence_index": 2,
+          "end_sentence_index": 7,
+          "start_time": 4.3,
+          "end_time": 62.96,
+          "duration": 58.66
         },
         {
-          "start_sentence_index": 23,
-          "end_sentence_index": 99,
-          "start_time": 81.88,
-          "end_time": 575.9,
-          "duration": 494.02
+          "start_sentence_index": 144,
+          "end_sentence_index": 145,
+          "start_time": 1147.32,
+          "end_time": 1152.72,
+          "duration": 5.4
         },
         {
-          "start_sentence_index": 116,
-          "end_sentence_index": 155,
-          "start_time": 638.9,
-          "end_time": 892.95,
-          "duration": 254.05
-        },
-        {
-          "start_sentence_index": 200,
-          "end_sentence_index": 288,
-          "start_time": 1066.98,
-          "end_time": 1620.75,
-          "duration": 553.77
+          "start_sentence_index": 147,
+          "end_sentence_index": 151,
+          "start_time": 1153.4,
+          "end_time": 1169.6,
+          "duration": 16.2
         }
       ],
-      "full_transcript": "Okay. Hello, everyone. Uh, today I have a very interesting session to start with. Uh, let's dive in. Actually, I wanna start with a question. How many of you guys know this person? Like, who is this? Any guesses? All right. His name is Dario Amodei. Most of you know him there, right? He's the CEO of Anthropic, and obviously an inventor of Claude. Uh, before taking further, let's quickly watch this. Like how can you really train AI? Probably we spent decades perfecting how to train human and, uh, building courses, writing scripts, recording, uh, videos, measuring completion rate. But here's the uncomfortable question, uh, which nobody in the room is asking for at, right? If AI is doing ninety percent of the work, who exactly are we building training for? And when you really think about it, take a coder for example. Today, AI writes ninety percent of code in almost most of the organization. And the human reviews the remaining ten percent. Tomorrow that ratio flips, could be flipped further. So here is the real question, right? If your workforce is increasingly using AI, why are we training videos still only for humans? Right. With that question, I want to hold onto that thought. Uh, what is gonna be the future if, uh, AI is getting heavier and heavier in terms of impact in the organization? How are we going to really make a difference as a company, as an organization, right? Especially in terms of training. With that said, let's dive into today's session, Think Claude, but for video courses. It's a very interesting topic. I have a power-packed sessions, lot of content, lot of videos, lot of interesting facts. So let's hold on to this whole session, and, uh, let's try to learn something interesting today, right? So this whole session, uh, actually from our company called Animaker. I'm the CEO of Animaker. So this... Here is a quick look of what we have been doing all these years. We have more than thirty-five million users worldwide using our products and different, different, uh, problems, different, different challenges, and we are one of the fifty design products in the world, and, uh, one AI platform for multiple tools, and lot of bragging, as you could see in the screen, like patents, like, uh, lot of video courses have been created. With that said, today's session we're gonna talk about, uh, top ten learnings, especially from millions of training videos created from Animaker, right? And second, we're gonna talk about the AI agents behind these training videos. We're gonna give lot of giveaways. And we also have some sort of like how to use AI agents and some of the interesting facts we have all of these giveaways as well. It's a very-- As I said, this is a very power-packed session. Let's dive in. Okay, let's start with top ten insights from Animaker's, uh, million training videos. All right, here is the fact one. All right. Quizzes are built and not bolted on. Like, what do we really mean by that is if you have seen for years, the quiz was always at the last. When you sat through the training, uh, the absorbed content and the answers, questions towards the end to prove you were paying attention. Always the last, always an afterthought, right? But the data recently got changed, which we have been seeing this interesting fact. Like one in ten training, uh, videos now have quiz, and especially part of the training content, part of those videos. Uh, what do we re- really mean by that is testing isn't just how we are, uh, measuring the learning. Now testing is becoming the learning. So we stopped bolting the quizzes towards the end, and we started building them in. Now the question comes first, like, uh, oh, what i-- what happened to this particular scenario, and things like that. Then you make the people un-- think, understand, and learn than pushing the quiz towards the end like a finish line anymore. Uh, they are, they are, they are, they are the road. I won't say quizzes are, are in finish line anymore. They are the road, right? So yeah, this is a very interesting fact. Now let's move to the next slide. Um, this is a very, again, interesting fact. Uh, micro-learning wins with the nano-engagement. Uh, here is a quick fact. As you could see, definitely 2026 having a huge head start in terms of micro-learning. But we started seeing a very interesting fact, uh, which isRight. So, so far the question to you, most of you guys, we all know microlearning is like a short form of content. Like it starts from two to minutes to ten minutes, very short videos. And, uh, we have all seen these microlearning explode in popularity in recent days, and we will keep using it in different, different scenarios. And here is an interesting data point as you could see. The average length of the microcontent has the quality, uh, the qual-- I mean, the quantity. I mean, the length of the video of a microcontent has quite grown a bit. What I mean by that is assume that if the average number is like three minutes, now it become five minutes. Now question to you guys who are listening, what do you think is the reason? Like why microcontent, uh, should have actually improved the number, right? Why it got raised? There are two explanations you could see in the slide. First, AI has made videos creation easier, right? Earlier we need to sit, develop, timeline adjustment and all of it. Now, uh, the idea is the videos, um, uh, could be generated easily, uh, with few prompts and few scripts. So the average length of the micro video got raised. And the second point, which is very interesting, is, um, uh, the nano engagement, that's what we call it as nano engagement, make it realistic. Uh, which means that the, the length doesn't matter as much as the people think. It doesn't matter if it is a ten-second clip or a five-minute lesson. If you really have a nano engagement throughout, like the hook, the pull, the twist, the surprise, and, uh, if you have anything to reset the attention, and while those are the moments, I think even a sixty-second quick clip, people just move away or a five-minute video could, could, could fly by like in a, in a fast pace. So I think most of these microlearning is not, uh, shrinking. It's getting smarter with nano engagements and nano learning, I would say. All right, let's move to the next. AI role-play is a new tutor. I mean, there are a lot of AI role-plays are being created, but, uh, people have been asking me, what are the areas we could actually use these role play, right? We-- So we came in this interesting scenario. Uh, there are job in your training which like a skill training, where you have a, a synchronous job like sales, customer service support. It's like a real time on ground live. So basically you can't have a pause button. Like you can't pause it and you can move on. So it's a, it's a very live real time. Uh, those we call it a synchronous job and asynchronous job is like marketing, coding, design, um, work on your own time, uh, day, day, night, right. So these are like called as asynchronous job. So as you could see, uh, what to pick, uh, from the AI role play is definitely synchronous job. If anything on the customer service support, those are the perfect examples for, uh, creating these roles. Right. So now let's move to the fact. So these are the list of AI role plays that people could be make best use case. There are like plenty of different use cases in this. Uh, okay, here is a quick video of, uh, how AI role play could be used. Great. Now let's look into the fact four. Uh, just storytelling is gaining a ground for sure. So here you go. Nearly one in five video prompts, especially if you're creating videos, uh, storytelling becomes a primary component of the prompts, or that's the way they want to present it, which is a very interesting fact. And another additional fact, as you could see, is that storytelling videos have twenty percentage of, uh, humor element in it. I know as a L&D course we used to call it a very serious topic, but as you could see the angle of engagement is going up and up. People have even started using humor part of the engagement as well. And, uh, this fact five is we got as transcreation is definitely surging, right? Uh, as you could see the fact, uh, there are-- there is a translation for sure, but there is a translation, there is a voiceover change, there is a textual change. There are different, different versions of things. And now people have been started using those real examples like if, if you are from New York you're gonna, uh, pick, uh, things which is in local like Statue of Liberty or if you're in San Francisco you're gonna use, uh, anything local to the area to give a reference. So there is a lot of localization is happening in the transcreation as you could see in the chart. Uh, here is a quick video example of, uh, live on video dubbing of, uh, uh, the respectful Mr. President, uh, ObamaI hope you and your loved ones are enjoying a happy, healthy, and joyful holiday season. Mientras reflexiono sobre el año pasado y miro hacia el próximo. Me siento muy agradecido por el apoyo que le han brindado a la Fundación Obama. Dank Ihrer Großzügigkeit und Unterstützung konnten wir das Jahr 2023 in einer starken Position abschließen und sind bereit, im Jahr 2024 voll durchzustarten. Das bedeutet, dass wir durchgehen mit dem Bau von dem Obama Presidential Center an der Südkant von Chicago. Das bedeutet, dass wir mehr junge Changemakers in unserem Netzwerk mogen verwelkommen und dass wir mehr Türen öffnen für Jungs und Mädchen via My Brother's Keeper und Girls Opportunity Alliance. Now fact number six, subtitle usage in training videos is definitely on the rise. Here is a fact, 2023, 2024, 2025, these numbers are keep going up, which is solid in itself. And fact seven, which is my favorite, whiteboard videos are always on rise. And especially in 2026 is again gaining back its attention. We have a good spike in terms of whiteboard videos, which is being utilized in different, different ways. And there is a reason in the bias in the data as well, because one in every is a big number. But we also recently launched this whiteboard features with AI and stuff like that. So there is definitely a tick on that. And fact eight is super realistic avatars. We have been keep seeing these real time avatars where you take a character, reusing it, especially for the redefining the instructor. Even the instructors are now using their own graphics and images to do this. And here we go. 2026 is there is almost 65% increase in the overall avatar based training videos. Yeah, I think a lot of people have started using these avatars to generate videos. Here is a very interesting example. Take a look. There are two things you can observe in this video. One is how real these characters are when there's AI. And it also talks about how you can actually pick a good course type. Like, for example, when you create a course, like are you going to create video lessons or are you going to create a quiz or a different purpose of a different course type. There we go. Fact number nine, growth in document to video. This feature and this way of video course is definitely used in areas where people don't want to change anything in that document, but still want to be in a video form. What do you mean by that? If you are going through a policy document or a compliance document or anything which demand or even an invoice, you don't need to have a different version of that. You don't want to repurpose it or redefine it, but you still want to have a video on it, right? So basically people play this videoHave a screen recording of it with the character. Now with AI, it's getting easier. Uh, you can upload a document and convert it to videos. That has been keep seeing a rise in number as well. And fact ten is, uh, is again one of my favorite, favorite, especially in twenty twenty-six, it should be everyone's favorite. Uh, business impact is the end goal for every L&D folks, right? Uh, again, what I mean by that is, uh, assume you're a, you know, L&D folks, any activity you do, it's not just course creation, any activity we do, I think one question, the number one question now I see CLOs, uh, chief, um, L&D teams and L&D, uh, managers, uh, everybody is really care about if I do an activity, does it really align? If I have three things to do, uh, out of these three, which one is going to directly impact the revenue or which is going to directly impact the profit? Are we gonna save some losses? I think that's how these L&D folks are now aligning themselves than creating a course or completing a course and all that. They'll come back and tell all we have created fifty courses which nobody have watched it, right? Like now people really don't care about the creation, distribution, but basically they are trying to pick courses, impactful content, and see if it can be kind of really profitable. So these are some good examples of, uh, different preferred course types which is impacting the pot. Uh, as you could say, we have rated this. And, uh, second is top preferred use case. The same type, but based on the use cases and impact in the L&D space as well. Uh, yeah, as you could see, leadership training, customer experience, customer onboarding is a top priority because it's gonna be impactful. And these are the industries who really, really think a course, uh, is gonna be of big use. And as you could exactly see if you're an agency, someone in the course creation business, uh, I would love to go to healthcare, banking, finance because they are the one who's still holding strong ground on the course creations and the, uh, those areas as well. All right, now, um, time to introduce us again. Uh, here is a quick video of, uh, who we are and what we are doing and how these amazing products and features and videos and content are being created. Very good. Here we go now. Still with me? Let's level this up. Here we go now. Here we go. Here we go. Here we go now. Here we have it. Here we have it. Here we go now. Here we go. Here we go. Here we go now. Here we have it. Here we have it. Here we go now. Here we go. Here we go. Here we go now. Here we have it. Here we have it. Here we go now. Here we go. Here we go. Here we go now. Thanks for watching it. Uh, let's call back this core idea which I have started, the AI just want to learn, right? We said that the AI just want to learn. The, the idea of the AI adoption across organization is happening in rapid speed. Organization is adopting, right, uh, introducing tools and introducing, um, agents, deploying interesting facts and data. On the other end, employees also started using almost every day. And, uh, there is a fact that, uh, there is-- They are also hiding the AI usage from the employer, which is again a very interesting fact to know. Uh, but if you really see the training teams, we are sitting in the middle between the organization who wants to foster change but have a lot of regulations. They have their own definition of AI. Yes, they want AI, but they have their own definition of AI. On the other end, there is employees, they have-- need AI, they have a own definition of AI. We trainers sit in the middle trying to bash on the walls to figure out what is right, what is wrong for them. And on the other end, we also have a lot of knowledge about what to be done. I think that's a foundation for this thinking of, uh, since humans are shrinking in different departments. Yes, it's gonna rise in other departments, but there are a lot of major departments are getting reduced. How can we really up the game in the training space, right? Uh, here is another simple chart of, uh, how training teams are right now aligned for, uh, adopting the AI usage, getting trained for the AI, uh, which is like who is training whom sort of thing. So are we ready to train both employees and AI? It's a trillion-dollar question or trillion-dollar question, but it's a question which has to be resonated. If you ask me, we are trying something to solve, uh, I'm gonna show you in the upcoming slide. Uh, but, uh, that's a question, uh, which is open to all of us. It's not just for us, it's, it's, it's a industry questionSo if we, if we are-- we have a lot of training content in place, and one side the research teams are very hungry in terms of learning or training with AI, how as a training team can be more useful, just like we are being useful for who is productive, who is impacting the business. I think, um, so far humans are the fundamental source behind this training. Now we could see, uh, these AIs demand training, demands growth. Uh, so I think, uh, that is-- this is an interesting piece of, uh, work we are working on. It's in, it's in a closed beta. Basically, every-- the LMS, the Nano LMS we have, so we, uh, basically in the Nano LMS we have, we have this, uh, thing called AI employee, where, uh, if you have your course and training content, it will be all put into a, a trainable module, which you can literally connect to a product like an Amazon or a Claude or your own local LLM models. Uh, if you have a data privacy and security in place, you can connect your own local, uh, organization models or ChatGPT to really make a, make a difference in your research team. They would love that as well. So again, the same thing. If the AI tool needs training to perform, uh, now Nano LMS is the best way to train both humans and the AI as, uh, we work. Again, thank you so much, guys. I'm almost done. So there are three giveaways quickly one by one. Uh, this is like a production-ready prompts to build L&D courses. Please can take it out. We're gonna-- We can also drop you some links to consume as well. And, uh, here is another interesting, um, um, cheat sheet, uh, course, which you can actually build out of, uh, just Claude. Use Claude to build your own courses. And, uh, this is like the list of prompts our L&D teams to create a, a very specific set of categories for trends as well, and especially course-based categories you can-- yes, better based on course categories. Scan it. And again, we're gonna drop all these links for your use. Thank you so much, guys. I really appreciate you keep listening to this whole stuff. I hope it is-- was helpful in some ways. Uh, thank you so much. Thanks for listening. I really appreciate it.",
+      "full_transcript": "It's a privilege to have Colonel David here with us, uh, for the session, uh, following lunch, right? So this is gonna awaken you. Um, the alumnus of National Defense Academy, Colonel David Devasahayam, was commissioned into Second Battalion of the In- Eighth Gorkha Rifles. After voluntarily retiring from the Indian Army, he set up the enormously successful Radian group of companies, which employs over eight thousand personnel. Radian Cash Management Service is presently the third largest cash logistics company in India, and recently went public with a very successful IPO. In 2012, he received the Socially Conscious Entrepreneur of the Year award, followed by the Udyog Ratna from the government of India. Put your hands together, ladies and gentlemen, as we invite Colonel David Devasahayam onto the stage. Thank you so much, Colonel. Uh, I think this is the closest you get to a soldier of Christ, literally. Uh, another wonderful, wonderful round of applause for this lovely couple. Um, I request- Sure, sure ... uh, Rajiv and Judith- Sure ... uh, to hand over the memento, uh, to Colonel. And rightly said, encrypted on it is Armor of God.",
       "sentences": [
         {
-          "index": 1,
-          "start": 0.08,
-          "end": 0.3,
-          "text": "Okay."
-        },
-        {
           "index": 2,
-          "start": 0.68,
-          "end": 1.24,
-          "text": "Hello, everyone."
+          "start": 4.3,
+          "end": 12.38,
+          "text": "It's a privilege to have Colonel David here with us, uh, for the session, uh, following lunch, right? So this is gonna awaken you."
         },
         {
           "index": 3,
-          "start": 1.8,
-          "end": 4.36,
-          "text": "Uh, today I have a very interesting session to start with."
+          "start": 13.02,
+          "end": 22.64,
+          "text": "Um, the alumnus of National Defense Academy, Colonel David Devasahayam, was commissioned into Second Battalion of the In- Eighth Gorkha Rifles."
         },
         {
           "index": 4,
-          "start": 5.76,
-          "end": 7.1,
-          "text": "Uh, let's dive in."
+          "start": 23.18,
+          "end": 33.5,
+          "text": "After voluntarily retiring from the Indian Army, he set up the enormously successful Radian group of companies, which employs over eight thousand personnel."
         },
         {
           "index": 5,
-          "start": 7.18,
-          "end": 8.92,
-          "text": "Actually, I wanna start with a question."
+          "start": 34.34,
+          "end": 45.7,
+          "text": "Radian Cash Management Service is presently the third largest cash logistics company in India, and recently went public with a very successful IPO."
         },
         {
           "index": 6,
-          "start": 11.02,
-          "end": 22.68,
-          "text": "How many of you guys know this person? Like, who is this? Any guesses? All right."
+          "start": 46.46,
+          "end": 55.46,
+          "text": "In 2012, he received the Socially Conscious Entrepreneur of the Year award, followed by the Udyog Ratna from the government of India."
         },
         {
           "index": 7,
-          "start": 23.58,
-          "end": 25.42,
-          "text": "His name is Dario Amodei."
-        },
-        {
-          "index": 8,
-          "start": 25.84,
-          "end": 35.28,
-          "text": "Most of you know him there, right? He's the CEO of Anthropic, and obviously an inventor of Claude."
-        },
-        {
-          "index": 9,
-          "start": 36.52,
-          "end": 39.82,
-          "text": "Uh, before taking further, let's quickly watch this."
-        },
-        {
-          "index": 23,
-          "start": 81.88,
-          "end": 96.18,
-          "text": "Like how can you really train AI? Probably we spent decades perfecting how to train human and, uh, building courses, writing scripts, recording, uh, videos, measuring completion rate."
-        },
-        {
-          "index": 24,
-          "start": 96.76,
-          "end": 118.3,
-          "text": "But here's the uncomfortable question, uh, which nobody in the room is asking for at, right? If AI is doing ninety percent of the work, who exactly are we building training for? And when you really think about it, take a coder for example."
-        },
-        {
-          "index": 25,
-          "start": 118.38,
-          "end": 123.02,
-          "text": "Today, AI writes ninety percent of code in almost most of the organization."
-        },
-        {
-          "index": 26,
-          "start": 125.38,
-          "end": 129.36,
-          "text": "And the human reviews the remaining ten percent."
-        },
-        {
-          "index": 27,
-          "start": 130.6,
-          "end": 133.34,
-          "text": "Tomorrow that ratio flips, could be flipped further."
-        },
-        {
-          "index": 28,
-          "start": 133.88,
-          "end": 145.02,
-          "text": "So here is the real question, right? If your workforce is increasingly using AI, why are we training videos still only for humans? Right."
-        },
-        {
-          "index": 29,
-          "start": 146.14,
-          "end": 149.16,
-          "text": "With that question, I want to hold onto that thought."
-        },
-        {
-          "index": 30,
-          "start": 150.22,
-          "end": 171.42,
-          "text": "Uh, what is gonna be the future if, uh, AI is getting heavier and heavier in terms of impact in the organization? How are we going to really make a difference as a company, as an organization, right? Especially in terms of training."
-        },
-        {
-          "index": 31,
-          "start": 172.22,
-          "end": 179.66,
-          "text": "With that said, let's dive into today's session, Think Claude, but for video courses."
-        },
-        {
-          "index": 32,
-          "start": 180.06,
-          "end": 181.28,
-          "text": "It's a very interesting topic."
-        },
-        {
-          "index": 33,
-          "start": 181.36,
-          "end": 186.16,
-          "text": "I have a power-packed sessions, lot of content, lot of videos, lot of interesting facts."
-        },
-        {
-          "index": 34,
-          "start": 186.2,
-          "end": 199.64,
-          "text": "So let's hold on to this whole session, and, uh, let's try to learn something interesting today, right? So this whole session, uh, actually from our company called Animaker."
-        },
-        {
-          "index": 35,
-          "start": 199.7,
-          "end": 200.9,
-          "text": "I'm the CEO of Animaker."
-        },
-        {
-          "index": 36,
-          "start": 201.6,
-          "end": 202.18,
-          "text": "So this..."
-        },
-        {
-          "index": 37,
-          "start": 202.24,
-          "end": 205.56,
-          "text": "Here is a quick look of what we have been doing all these years."
-        },
-        {
-          "index": 38,
-          "start": 205.96,
-          "end": 226.02,
-          "text": "We have more than thirty-five million users worldwide using our products and different, different, uh, problems, different, different challenges, and we are one of the fifty design products in the world, and, uh, one AI platform for multiple tools, and lot of bragging, as you could see in the screen, like patents, like, uh, lot of video courses have been created."
-        },
-        {
-          "index": 39,
-          "start": 226.2,
-          "end": 240.14,
-          "text": "With that said, today's session we're gonna talk about, uh, top ten learnings, especially from millions of training videos created from Animaker, right? And second, we're gonna talk about the AI agents behind these training videos."
-        },
-        {
-          "index": 40,
-          "start": 240.16,
-          "end": 241.84,
-          "text": "We're gonna give lot of giveaways."
-        },
-        {
-          "index": 41,
-          "start": 242.26,
-          "end": 249.02,
-          "text": "And we also have some sort of like how to use AI agents and some of the interesting facts we have all of these giveaways as well."
-        },
-        {
-          "index": 42,
-          "start": 249.38,
-          "end": 251.36,
-          "text": "It's a very-- As I said, this is a very power-packed session."
-        },
-        {
-          "index": 43,
-          "start": 251.44,
-          "end": 252.6,
-          "text": "Let's dive in."
-        },
-        {
-          "index": 44,
-          "start": 253.76,
-          "end": 258.24,
-          "text": "Okay, let's start with top ten insights from Animaker's, uh, million training videos."
-        },
-        {
-          "index": 45,
-          "start": 260.16,
-          "end": 261.36,
-          "text": "All right, here is the fact one."
-        },
-        {
-          "index": 46,
-          "start": 262.44,
-          "end": 262.68,
-          "text": "All right."
-        },
-        {
-          "index": 47,
-          "start": 263.02,
-          "end": 268.2,
-          "text": "Quizzes are built and not bolted on."
-        },
-        {
-          "index": 48,
-          "start": 268.26,
-          "end": 274.36,
-          "text": "Like, what do we really mean by that is if you have seen for years, the quiz was always at the last."
-        },
-        {
-          "index": 49,
-          "start": 275.2,
-          "end": 285.0,
-          "text": "When you sat through the training, uh, the absorbed content and the answers, questions towards the end to prove you were paying attention."
-        },
-        {
-          "index": 50,
-          "start": 285.66,
-          "end": 294.9,
-          "text": "Always the last, always an afterthought, right? But the data recently got changed, which we have been seeing this interesting fact."
-        },
-        {
-          "index": 51,
-          "start": 295.78,
-          "end": 303.32,
-          "text": "Like one in ten training, uh, videos now have quiz, and especially part of the training content, part of those videos."
-        },
-        {
-          "index": 52,
-          "start": 304.28,
-          "end": 310.56,
-          "text": "Uh, what do we re- really mean by that is testing isn't just how we are, uh, measuring the learning."
-        },
-        {
-          "index": 53,
-          "start": 311.1,
-          "end": 313.18,
-          "text": "Now testing is becoming the learning."
-        },
-        {
-          "index": 54,
-          "start": 313.58,
-          "end": 318.4,
-          "text": "So we stopped bolting the quizzes towards the end, and we started building them in."
-        },
-        {
-          "index": 55,
-          "start": 319.0,
-          "end": 325.52,
-          "text": "Now the question comes first, like, uh, oh, what i-- what happened to this particular scenario, and things like that."
-        },
-        {
-          "index": 56,
-          "start": 325.56,
-          "end": 334.44,
-          "text": "Then you make the people un-- think, understand, and learn than pushing the quiz towards the end like a finish line anymore."
-        },
-        {
-          "index": 57,
-          "start": 334.6,
-          "end": 337.48,
-          "text": "Uh, they are, they are, they are, they are the road."
-        },
-        {
-          "index": 58,
-          "start": 337.58,
-          "end": 341.46,
-          "text": "I won't say quizzes are, are in finish line anymore."
-        },
-        {
-          "index": 59,
-          "start": 341.84,
-          "end": 345.32,
-          "text": "They are the road, right? So yeah, this is a very interesting fact."
-        },
-        {
-          "index": 60,
-          "start": 345.4,
-          "end": 348.18,
-          "text": "Now let's move to the next slide."
-        },
-        {
-          "index": 61,
-          "start": 348.38,
-          "end": 350.72,
-          "text": "Um, this is a very, again, interesting fact."
-        },
-        {
-          "index": 62,
-          "start": 351.1,
-          "end": 354.4,
-          "text": "Uh, micro-learning wins with the nano-engagement."
-        },
-        {
-          "index": 63,
-          "start": 354.86,
-          "end": 356.72,
-          "text": "Uh, here is a quick fact."
-        },
-        {
-          "index": 64,
-          "start": 356.78,
-          "end": 362.34,
-          "text": "As you could see, definitely 2026 having a huge head start in terms of micro-learning."
-        },
-        {
-          "index": 65,
-          "start": 362.92,
-          "end": 370.02,
-          "text": "But we started seeing a very interesting fact, uh, which isRight."
-        },
-        {
-          "index": 66,
-          "start": 370.06,
-          "end": 375.5,
-          "text": "So, so far the question to you, most of you guys, we all know microlearning is like a short form of content."
-        },
-        {
-          "index": 67,
-          "start": 375.52,
-          "end": 379.52,
-          "text": "Like it starts from two to minutes to ten minutes, very short videos."
-        },
-        {
-          "index": 68,
-          "start": 379.92,
-          "end": 386.98,
-          "text": "And, uh, we have all seen these microlearning explode in popularity in recent days, and we will keep using it in different, different scenarios."
-        },
-        {
-          "index": 69,
-          "start": 387.52,
-          "end": 390.58,
-          "text": "And here is an interesting data point as you could see."
-        },
-        {
-          "index": 70,
-          "start": 391.04,
-          "end": 396.46,
-          "text": "The average length of the microcontent has the quality, uh, the qual-- I mean, the quantity."
-        },
-        {
-          "index": 71,
-          "start": 396.52,
-          "end": 401.92,
-          "text": "I mean, the length of the video of a microcontent has quite grown a bit."
-        },
-        {
-          "index": 72,
-          "start": 402.5,
-          "end": 407.38,
-          "text": "What I mean by that is assume that if the average number is like three minutes, now it become five minutes."
-        },
-        {
-          "index": 73,
-          "start": 407.74,
-          "end": 424.9,
-          "text": "Now question to you guys who are listening, what do you think is the reason? Like why microcontent, uh, should have actually improved the number, right? Why it got raised? There are two explanations you could see in the slide."
-        },
-        {
-          "index": 74,
-          "start": 425.02,
-          "end": 432.46,
-          "text": "First, AI has made videos creation easier, right? Earlier we need to sit, develop, timeline adjustment and all of it."
-        },
-        {
-          "index": 75,
-          "start": 432.84,
-          "end": 442.24,
-          "text": "Now, uh, the idea is the videos, um, uh, could be generated easily, uh, with few prompts and few scripts."
-        },
-        {
-          "index": 76,
-          "start": 442.32,
-          "end": 444.56,
-          "text": "So the average length of the micro video got raised."
-        },
-        {
-          "index": 77,
-          "start": 445.24,
-          "end": 457.9,
-          "text": "And the second point, which is very interesting, is, um, uh, the nano engagement, that's what we call it as nano engagement, make it realistic."
-        },
-        {
-          "index": 78,
-          "start": 459.08,
-          "end": 462.78,
-          "text": "Uh, which means that the, the length doesn't matter as much as the people think."
-        },
-        {
-          "index": 79,
-          "start": 463.24,
-          "end": 466.78,
-          "text": "It doesn't matter if it is a ten-second clip or a five-minute lesson."
-        },
-        {
-          "index": 80,
-          "start": 467.98,
-          "end": 490.36,
-          "text": "If you really have a nano engagement throughout, like the hook, the pull, the twist, the surprise, and, uh, if you have anything to reset the attention, and while those are the moments, I think even a sixty-second quick clip, people just move away or a five-minute video could, could, could fly by like in a, in a fast pace."
-        },
-        {
-          "index": 81,
-          "start": 490.48,
-          "end": 494.52,
-          "text": "So I think most of these microlearning is not, uh, shrinking."
-        },
-        {
-          "index": 82,
-          "start": 494.6,
-          "end": 498.92,
-          "text": "It's getting smarter with nano engagements and nano learning, I would say."
-        },
-        {
-          "index": 83,
-          "start": 499.48,
-          "end": 500.48,
-          "text": "All right, let's move to the next."
-        },
-        {
-          "index": 84,
-          "start": 500.88,
-          "end": 503.02,
-          "text": "AI role-play is a new tutor."
-        },
-        {
-          "index": 85,
-          "start": 503.66,
-          "end": 514.4,
-          "text": "I mean, there are a lot of AI role-plays are being created, but, uh, people have been asking me, what are the areas we could actually use these role play, right? We-- So we came in this interesting scenario."
-        },
-        {
-          "index": 86,
-          "start": 515.46,
-          "end": 524.02,
-          "text": "Uh, there are job in your training which like a skill training, where you have a, a synchronous job like sales, customer service support."
-        },
-        {
-          "index": 87,
-          "start": 524.08,
-          "end": 526.88,
-          "text": "It's like a real time on ground live."
-        },
-        {
-          "index": 88,
-          "start": 527.52,
-          "end": 528.92,
-          "text": "So basically you can't have a pause button."
-        },
-        {
-          "index": 89,
-          "start": 528.94,
-          "end": 530.54,
-          "text": "Like you can't pause it and you can move on."
-        },
-        {
-          "index": 90,
-          "start": 531.06,
-          "end": 532.9,
-          "text": "So it's a, it's a very live real time."
-        },
-        {
-          "index": 91,
-          "start": 533.62,
-          "end": 543.45,
-          "text": "Uh, those we call it a synchronous job and asynchronous job is like marketing, coding, design, um, work on your own time, uh, day, day, night, right."
-        },
-        {
-          "index": 92,
-          "start": 543.48,
-          "end": 545.42,
-          "text": "So these are like called as asynchronous job."
-        },
-        {
-          "index": 93,
-          "start": 546.04,
-          "end": 551.64,
-          "text": "So as you could see, uh, what to pick, uh, from the AI role play is definitely synchronous job."
-        },
-        {
-          "index": 94,
-          "start": 551.7,
-          "end": 557.64,
-          "text": "If anything on the customer service support, those are the perfect examples for, uh, creating these roles."
-        },
-        {
-          "index": 95,
-          "start": 558.68,
-          "end": 558.9,
-          "text": "Right."
-        },
-        {
-          "index": 96,
-          "start": 559.04,
-          "end": 562.02,
-          "text": "So now let's move to the fact."
-        },
-        {
-          "index": 97,
-          "start": 562.44,
-          "end": 567.28,
-          "text": "So these are the list of AI role plays that people could be make best use case."
-        },
-        {
-          "index": 98,
-          "start": 567.3,
-          "end": 570.08,
-          "text": "There are like plenty of different use cases in this."
-        },
-        {
-          "index": 99,
-          "start": 572.42,
-          "end": 575.9,
-          "text": "Uh, okay, here is a quick video of, uh, how AI role play could be used."
-        },
-        {
-          "index": 116,
-          "start": 638.9,
-          "end": 639.14,
-          "text": "Great."
-        },
-        {
-          "index": 117,
-          "start": 639.56,
-          "end": 641.34,
-          "text": "Now let's look into the fact four."
-        },
-        {
-          "index": 118,
-          "start": 641.72,
-          "end": 645.14,
-          "text": "Uh, just storytelling is gaining a ground for sure."
-        },
-        {
-          "index": 119,
-          "start": 645.76,
-          "end": 646.62,
-          "text": "So here you go."
-        },
-        {
-          "index": 120,
-          "start": 647.34,
-          "end": 658.1,
-          "text": "Nearly one in five video prompts, especially if you're creating videos, uh, storytelling becomes a primary component of the prompts, or that's the way they want to present it, which is a very interesting fact."
-        },
-        {
-          "index": 121,
-          "start": 658.9,
-          "end": 667.34,
-          "text": "And another additional fact, as you could see, is that storytelling videos have twenty percentage of, uh, humor element in it."
-        },
-        {
-          "index": 122,
-          "start": 667.96,
-          "end": 675.46,
-          "text": "I know as a L&D course we used to call it a very serious topic, but as you could see the angle of engagement is going up and up."
-        },
-        {
-          "index": 123,
-          "start": 675.6,
-          "end": 678.52,
-          "text": "People have even started using humor part of the engagement as well."
-        },
-        {
-          "index": 124,
-          "start": 680.08,
-          "end": 694.62,
-          "text": "And, uh, this fact five is we got as transcreation is definitely surging, right? Uh, as you could see the fact, uh, there are-- there is a translation for sure, but there is a translation, there is a voiceover change, there is a textual change."
-        },
-        {
-          "index": 125,
-          "start": 694.66,
-          "end": 697.24,
-          "text": "There are different, different versions of things."
-        },
-        {
-          "index": 126,
-          "start": 697.44,
-          "end": 712.6,
-          "text": "And now people have been started using those real examples like if, if you are from New York you're gonna, uh, pick, uh, things which is in local like Statue of Liberty or if you're in San Francisco you're gonna use, uh, anything local to the area to give a reference."
-        },
-        {
-          "index": 127,
-          "start": 712.64,
-          "end": 717.68,
-          "text": "So there is a lot of localization is happening in the transcreation as you could see in the chart."
-        },
-        {
-          "index": 128,
-          "start": 718.34,
-          "end": 726.92,
-          "text": "Uh, here is a quick video example of, uh, live on video dubbing of, uh, uh, the respectful Mr."
-        },
-        {
-          "index": 129,
-          "start": 727.18,
-          "end": 736.2,
-          "text": "President, uh, ObamaI hope you and your loved ones are enjoying a happy, healthy, and joyful holiday season."
-        },
-        {
-          "index": 130,
-          "start": 737.4,
-          "end": 740.66,
-          "text": "Mientras reflexiono sobre el año pasado y miro hacia el próximo."
-        },
-        {
-          "index": 131,
-          "start": 742.26,
-          "end": 746.3,
-          "text": "Me siento muy agradecido por el apoyo que le han brindado a la Fundación Obama."
-        },
-        {
-          "index": 132,
-          "start": 747.52,
-          "end": 760.0,
-          "text": "Dank Ihrer Großzügigkeit und Unterstützung konnten wir das Jahr 2023 in einer starken Position abschließen und sind bereit, im Jahr 2024 voll durchzustarten."
-        },
-        {
-          "index": 133,
-          "start": 761.0,
-          "end": 768.0,
-          "text": "Das bedeutet, dass wir durchgehen mit dem Bau von dem Obama Presidential Center an der Südkant von Chicago."
-        },
-        {
-          "index": 134,
-          "start": 768.42,
-          "end": 779.82,
-          "text": "Das bedeutet, dass wir mehr junge Changemakers in unserem Netzwerk mogen verwelkommen und dass wir mehr Türen öffnen für Jungs und Mädchen via My Brother's Keeper und Girls Opportunity Alliance."
-        },
-        {
-          "index": 135,
-          "start": 781.3,
-          "end": 786.68,
-          "text": "Now fact number six, subtitle usage in training videos is definitely on the rise."
-        },
-        {
-          "index": 136,
-          "start": 787.64,
-          "end": 796.58,
-          "text": "Here is a fact, 2023, 2024, 2025, these numbers are keep going up, which is solid in itself."
-        },
-        {
-          "index": 137,
-          "start": 796.66,
-          "end": 802.74,
-          "text": "And fact seven, which is my favorite, whiteboard videos are always on rise."
-        },
-        {
-          "index": 138,
-          "start": 803.94,
-          "end": 808.56,
-          "text": "And especially in 2026 is again gaining back its attention."
-        },
-        {
-          "index": 139,
-          "start": 808.6,
-          "end": 816.04,
-          "text": "We have a good spike in terms of whiteboard videos, which is being utilized in different, different ways."
-        },
-        {
-          "index": 140,
-          "start": 816.32,
-          "end": 821.3,
-          "text": "And there is a reason in the bias in the data as well, because one in every is a big number."
-        },
-        {
-          "index": 141,
-          "start": 821.72,
-          "end": 824.83,
-          "text": "But we also recently launched this whiteboard features with AI and stuff like that."
-        },
-        {
-          "index": 142,
-          "start": 824.84,
-          "end": 827.88,
-          "text": "So there is definitely a tick on that."
-        },
-        {
-          "index": 143,
-          "start": 829.04,
-          "end": 831.2,
-          "text": "And fact eight is super realistic avatars."
+          "start": 55.76,
+          "end": 62.96,
+          "text": "Put your hands together, ladies and gentlemen, as we invite Colonel David Devasahayam onto the stage."
         },
         {
           "index": 144,
-          "start": 831.36,
-          "end": 839.38,
-          "text": "We have been keep seeing these real time avatars where you take a character, reusing it, especially for the redefining the instructor."
+          "start": 1147.32,
+          "end": 1148.46,
+          "text": "Thank you so much, Colonel."
         },
         {
           "index": 145,
-          "start": 839.68,
-          "end": 843.86,
-          "text": "Even the instructors are now using their own graphics and images to do this."
-        },
-        {
-          "index": 146,
-          "start": 845.4,
-          "end": 846.64,
-          "text": "And here we go."
+          "start": 1148.74,
+          "end": 1152.72,
+          "text": "Uh, I think this is the closest you get to a soldier of Christ, literally."
         },
         {
           "index": 147,
-          "start": 846.88,
-          "end": 853.6,
-          "text": "2026 is there is almost 65% increase in the overall avatar based training videos."
+          "start": 1153.4,
+          "end": 1156.84,
+          "text": "Uh, another wonderful, wonderful round of applause for this lovely couple."
         },
         {
           "index": 148,
-          "start": 854.42,
-          "end": 860.76,
-          "text": "Yeah, I think a lot of people have started using these avatars to generate videos."
+          "start": 1157.6,
+          "end": 1160.13,
+          "text": "Um, I request- Sure, sure ..."
         },
         {
           "index": 149,
-          "start": 862.3,
-          "end": 864.56,
-          "text": "Here is a very interesting example."
+          "start": 1160.9,
+          "end": 1162.64,
+          "text": "uh, Rajiv and Judith- Sure ..."
         },
         {
           "index": 150,
-          "start": 865.58,
-          "end": 866.1,
-          "text": "Take a look."
+          "start": 1162.65,
+          "end": 1165.4,
+          "text": "uh, to hand over the memento, uh, to Colonel."
         },
         {
           "index": 151,
-          "start": 866.62,
-          "end": 868.3,
-          "text": "There are two things you can observe in this video."
-        },
-        {
-          "index": 152,
-          "start": 868.48,
-          "end": 874.86,
-          "text": "One is how real these characters are when there's AI."
-        },
-        {
-          "index": 153,
-          "start": 875.5,
-          "end": 881.72,
-          "text": "And it also talks about how you can actually pick a good course type."
-        },
-        {
-          "index": 154,
-          "start": 881.86,
-          "end": 892.18,
-          "text": "Like, for example, when you create a course, like are you going to create video lessons or are you going to create a quiz or a different purpose of a different course type."
-        },
-        {
-          "index": 155,
-          "start": 892.7,
-          "end": 892.95,
-          "text": "There we go."
-        },
-        {
-          "index": 200,
-          "start": 1066.98,
-          "end": 1070.8,
-          "text": "Fact number nine, growth in document to video."
-        },
-        {
-          "index": 201,
-          "start": 1072.0,
-          "end": 1085.8,
-          "text": "This feature and this way of video course is definitely used in areas where people don't want to change anything in that document, but still want to be in a video form."
-        },
-        {
-          "index": 202,
-          "start": 1085.82,
-          "end": 1098.36,
-          "text": "What do you mean by that? If you are going through a policy document or a compliance document or anything which demand or even an invoice, you don't need to have a different version of that."
-        },
-        {
-          "index": 203,
-          "start": 1098.42,
-          "end": 1107.72,
-          "text": "You don't want to repurpose it or redefine it, but you still want to have a video on it, right? So basically people play this videoHave a screen recording of it with the character."
-        },
-        {
-          "index": 204,
-          "start": 1107.8,
-          "end": 1109.54,
-          "text": "Now with AI, it's getting easier."
-        },
-        {
-          "index": 205,
-          "start": 1110.1,
-          "end": 1112.42,
-          "text": "Uh, you can upload a document and convert it to videos."
-        },
-        {
-          "index": 206,
-          "start": 1112.7,
-          "end": 1115.26,
-          "text": "That has been keep seeing a rise in number as well."
-        },
-        {
-          "index": 207,
-          "start": 1116.78,
-          "end": 1124.6,
-          "text": "And fact ten is, uh, is again one of my favorite, favorite, especially in twenty twenty-six, it should be everyone's favorite."
-        },
-        {
-          "index": 208,
-          "start": 1125.98,
-          "end": 1174.11,
-          "text": "Uh, business impact is the end goal for every L&D folks, right? Uh, again, what I mean by that is, uh, assume you're a, you know, L&D folks, any activity you do, it's not just course creation, any activity we do, I think one question, the number one question now I see CLOs, uh, chief, um, L&D teams and L&D, uh, managers, uh, everybody is really care about if I do an activity, does it really align? If I have three things to do, uh, out of these three, which one is going to directly impact the revenue or which is going to directly impact the profit? Are we gonna save some losses? I think that's how these L&D folks are now aligning themselves than creating a course or completing a course and all that."
-        },
-        {
-          "index": 209,
-          "start": 1174.39,
-          "end": 1189.76,
-          "text": "They'll come back and tell all we have created fifty courses which nobody have watched it, right? Like now people really don't care about the creation, distribution, but basically they are trying to pick courses, impactful content, and see if it can be kind of really profitable."
-        },
-        {
-          "index": 210,
-          "start": 1189.8,
-          "end": 1197.24,
-          "text": "So these are some good examples of, uh, different preferred course types which is impacting the pot."
-        },
-        {
-          "index": 211,
-          "start": 1198.32,
-          "end": 1200.82,
-          "text": "Uh, as you could say, we have rated this."
-        },
-        {
-          "index": 212,
-          "start": 1200.84,
-          "end": 1202.63,
-          "text": "And, uh, second is top preferred use case."
-        },
-        {
-          "index": 213,
-          "start": 1202.72,
-          "end": 1207.32,
-          "text": "The same type, but based on the use cases and impact in the L&D space as well."
-        },
-        {
-          "index": 214,
-          "start": 1208.3,
-          "end": 1215.91,
-          "text": "Uh, yeah, as you could see, leadership training, customer experience, customer onboarding is a top priority because it's gonna be impactful."
-        },
-        {
-          "index": 215,
-          "start": 1216.36,
-          "end": 1222.02,
-          "text": "And these are the industries who really, really think a course, uh, is gonna be of big use."
-        },
-        {
-          "index": 216,
-          "start": 1222.18,
-          "end": 1240.84,
-          "text": "And as you could exactly see if you're an agency, someone in the course creation business, uh, I would love to go to healthcare, banking, finance because they are the one who's still holding strong ground on the course creations and the, uh, those areas as well."
-        },
-        {
-          "index": 217,
-          "start": 1241.38,
-          "end": 1245.6,
-          "text": "All right, now, um, time to introduce us again."
-        },
-        {
-          "index": 218,
-          "start": 1245.88,
-          "end": 1254.58,
-          "text": "Uh, here is a quick video of, uh, who we are and what we are doing and how these amazing products and features and videos and content are being created."
-        },
-        {
-          "index": 219,
-          "start": 1256.46,
-          "end": 1257.9,
-          "text": "Very good."
-        },
-        {
-          "index": 220,
-          "start": 1292.8,
-          "end": 1293.7,
-          "text": "Here we go now."
-        },
-        {
-          "index": 221,
-          "start": 1296.32,
-          "end": 1299.24,
-          "text": "Still with me? Let's level this up."
-        },
-        {
-          "index": 222,
-          "start": 1324.84,
-          "end": 1325.82,
-          "text": "Here we go now."
-        },
-        {
-          "index": 223,
-          "start": 1326.8,
-          "end": 1327.5,
-          "text": "Here we go."
-        },
-        {
-          "index": 224,
-          "start": 1327.82,
-          "end": 1327.91,
-          "text": "Here we go."
-        },
-        {
-          "index": 225,
-          "start": 1327.91,
-          "end": 1328.03,
-          "text": "Here we go now."
-        },
-        {
-          "index": 226,
-          "start": 1328.03,
-          "end": 1328.05,
-          "text": "Here we have it."
-        },
-        {
-          "index": 227,
-          "start": 1328.05,
-          "end": 1328.13,
-          "text": "Here we have it."
-        },
-        {
-          "index": 228,
-          "start": 1328.13,
-          "end": 1328.66,
-          "text": "Here we go now."
-        },
-        {
-          "index": 229,
-          "start": 1328.84,
-          "end": 1328.87,
-          "text": "Here we go."
-        },
-        {
-          "index": 230,
-          "start": 1328.87,
-          "end": 1328.87,
-          "text": "Here we go."
-        },
-        {
-          "index": 231,
-          "start": 1328.87,
-          "end": 1329.58,
-          "text": "Here we go now."
-        },
-        {
-          "index": 232,
-          "start": 1330.82,
-          "end": 1331.54,
-          "text": "Here we have it."
-        },
-        {
-          "index": 233,
-          "start": 1331.8,
-          "end": 1332.11,
-          "text": "Here we have it."
-        },
-        {
-          "index": 234,
-          "start": 1332.11,
-          "end": 1332.11,
-          "text": "Here we go now."
-        },
-        {
-          "index": 235,
-          "start": 1332.11,
-          "end": 1332.11,
-          "text": "Here we go."
-        },
-        {
-          "index": 236,
-          "start": 1332.11,
-          "end": 1332.11,
-          "text": "Here we go."
-        },
-        {
-          "index": 237,
-          "start": 1332.11,
-          "end": 1332.11,
-          "text": "Here we go now."
-        },
-        {
-          "index": 238,
-          "start": 1332.11,
-          "end": 1332.11,
-          "text": "Here we have it."
-        },
-        {
-          "index": 239,
-          "start": 1332.11,
-          "end": 1333.26,
-          "text": "Here we have it."
-        },
-        {
-          "index": 240,
-          "start": 1333.68,
-          "end": 1334.18,
-          "text": "Here we go now."
-        },
-        {
-          "index": 241,
-          "start": 1334.82,
-          "end": 1335.46,
-          "text": "Here we go."
-        },
-        {
-          "index": 242,
-          "start": 1335.82,
-          "end": 1336.78,
-          "text": "Here we go."
-        },
-        {
-          "index": 243,
-          "start": 1336.82,
-          "end": 1342.32,
-          "text": "Here we go now."
-        },
-        {
-          "index": 244,
-          "start": 1343.54,
-          "end": 1351.08,
-          "text": "Thanks for watching it."
-        },
-        {
-          "index": 245,
-          "start": 1351.74,
-          "end": 1358.9,
-          "text": "Uh, let's call back this core idea which I have started, the AI just want to learn, right? We said that the AI just want to learn."
-        },
-        {
-          "index": 246,
-          "start": 1359.64,
-          "end": 1363.62,
-          "text": "The, the idea of the AI adoption across organization is happening in rapid speed."
-        },
-        {
-          "index": 247,
-          "start": 1363.72,
-          "end": 1373.14,
-          "text": "Organization is adopting, right, uh, introducing tools and introducing, um, agents, deploying interesting facts and data."
-        },
-        {
-          "index": 248,
-          "start": 1373.18,
-          "end": 1377.48,
-          "text": "On the other end, employees also started using almost every day."
-        },
-        {
-          "index": 249,
-          "start": 1378.18,
-          "end": 1387.06,
-          "text": "And, uh, there is a fact that, uh, there is-- They are also hiding the AI usage from the employer, which is again a very interesting fact to know."
-        },
-        {
-          "index": 250,
-          "start": 1387.64,
-          "end": 1396.5,
-          "text": "Uh, but if you really see the training teams, we are sitting in the middle between the organization who wants to foster change but have a lot of regulations."
-        },
-        {
-          "index": 251,
-          "start": 1396.82,
-          "end": 1398.44,
-          "text": "They have their own definition of AI."
-        },
-        {
-          "index": 252,
-          "start": 1398.56,
-          "end": 1401.26,
-          "text": "Yes, they want AI, but they have their own definition of AI."
-        },
-        {
-          "index": 253,
-          "start": 1401.32,
-          "end": 1405.64,
-          "text": "On the other end, there is employees, they have-- need AI, they have a own definition of AI."
-        },
-        {
-          "index": 254,
-          "start": 1406.18,
-          "end": 1412.12,
-          "text": "We trainers sit in the middle trying to bash on the walls to figure out what is right, what is wrong for them."
-        },
-        {
-          "index": 255,
-          "start": 1412.64,
-          "end": 1416.24,
-          "text": "And on the other end, we also have a lot of knowledge about what to be done."
-        },
-        {
-          "index": 256,
-          "start": 1417.0,
-          "end": 1423.52,
-          "text": "I think that's a foundation for this thinking of, uh, since humans are shrinking in different departments."
-        },
-        {
-          "index": 257,
-          "start": 1423.62,
-          "end": 1428.72,
-          "text": "Yes, it's gonna rise in other departments, but there are a lot of major departments are getting reduced."
-        },
-        {
-          "index": 258,
-          "start": 1428.74,
-          "end": 1447.02,
-          "text": "How can we really up the game in the training space, right? Uh, here is another simple chart of, uh, how training teams are right now aligned for, uh, adopting the AI usage, getting trained for the AI, uh, which is like who is training whom sort of thing."
-        },
-        {
-          "index": 259,
-          "start": 1447.12,
-          "end": 1456.56,
-          "text": "So are we ready to train both employees and AI? It's a trillion-dollar question or trillion-dollar question, but it's a question which has to be resonated."
-        },
-        {
-          "index": 260,
-          "start": 1456.62,
-          "end": 1462.34,
-          "text": "If you ask me, we are trying something to solve, uh, I'm gonna show you in the upcoming slide."
-        },
-        {
-          "index": 261,
-          "start": 1462.96,
-          "end": 1466.7,
-          "text": "Uh, but, uh, that's a question, uh, which is open to all of us."
-        },
-        {
-          "index": 262,
-          "start": 1466.74,
-          "end": 1489.48,
-          "text": "It's not just for us, it's, it's, it's a industry questionSo if we, if we are-- we have a lot of training content in place, and one side the research teams are very hungry in terms of learning or training with AI, how as a training team can be more useful, just like we are being useful for who is productive, who is impacting the business."
-        },
-        {
-          "index": 263,
-          "start": 1489.82,
-          "end": 1494.14,
-          "text": "I think, um, so far humans are the fundamental source behind this training."
-        },
-        {
-          "index": 264,
-          "start": 1494.52,
-          "end": 1500.1,
-          "text": "Now we could see, uh, these AIs demand training, demands growth."
-        },
-        {
-          "index": 265,
-          "start": 1500.86,
-          "end": 1508.06,
-          "text": "Uh, so I think, uh, that is-- this is an interesting piece of, uh, work we are working on."
-        },
-        {
-          "index": 266,
-          "start": 1508.3,
-          "end": 1509.82,
-          "text": "It's in, it's in a closed beta."
-        },
-        {
-          "index": 267,
-          "start": 1510.3,
-          "end": 1534.54,
-          "text": "Basically, every-- the LMS, the Nano LMS we have, so we, uh, basically in the Nano LMS we have, we have this, uh, thing called AI employee, where, uh, if you have your course and training content, it will be all put into a, a trainable module, which you can literally connect to a product like an Amazon or a Claude or your own local LLM models."
-        },
-        {
-          "index": 268,
-          "start": 1535.14,
-          "end": 1546.64,
-          "text": "Uh, if you have a data privacy and security in place, you can connect your own local, uh, organization models or ChatGPT to really make a, make a difference in your research team."
-        },
-        {
-          "index": 269,
-          "start": 1546.92,
-          "end": 1548.08,
-          "text": "They would love that as well."
-        },
-        {
-          "index": 270,
-          "start": 1549.66,
-          "end": 1550.86,
-          "text": "So again, the same thing."
-        },
-        {
-          "index": 271,
-          "start": 1550.9,
-          "end": 1561.64,
-          "text": "If the AI tool needs training to perform, uh, now Nano LMS is the best way to train both humans and the AI as, uh, we work."
-        },
-        {
-          "index": 272,
-          "start": 1562.68,
-          "end": 1563.64,
-          "text": "Again, thank you so much, guys."
-        },
-        {
-          "index": 273,
-          "start": 1563.68,
-          "end": 1564.45,
-          "text": "I'm almost done."
-        },
-        {
-          "index": 274,
-          "start": 1564.68,
-          "end": 1566.9,
-          "text": "So there are three giveaways quickly one by one."
-        },
-        {
-          "index": 275,
-          "start": 1567.7,
-          "end": 1571.32,
-          "text": "Uh, this is like a production-ready prompts to build L&D courses."
-        },
-        {
-          "index": 276,
-          "start": 1571.33,
-          "end": 1573.06,
-          "text": "Please can take it out."
-        },
-        {
-          "index": 277,
-          "start": 1573.1,
-          "end": 1576.64,
-          "text": "We're gonna-- We can also drop you some links to consume as well."
-        },
-        {
-          "index": 278,
-          "start": 1577.32,
-          "end": 1586.54,
-          "text": "And, uh, here is another interesting, um, um, cheat sheet, uh, course, which you can actually build out of, uh, just Claude."
-        },
-        {
-          "index": 279,
-          "start": 1586.74,
-          "end": 1588.2,
-          "text": "Use Claude to build your own courses."
-        },
-        {
-          "index": 280,
-          "start": 1589.38,
-          "end": 1602.04,
-          "text": "And, uh, this is like the list of prompts our L&D teams to create a, a very specific set of categories for trends as well, and especially course-based categories you can-- yes, better based on course categories."
-        },
-        {
-          "index": 281,
-          "start": 1602.52,
-          "end": 1602.96,
-          "text": "Scan it."
-        },
-        {
-          "index": 282,
-          "start": 1602.98,
-          "end": 1605.2,
-          "text": "And again, we're gonna drop all these links for your use."
-        },
-        {
-          "index": 283,
-          "start": 1606.1,
-          "end": 1607.06,
-          "text": "Thank you so much, guys."
-        },
-        {
-          "index": 284,
-          "start": 1607.12,
-          "end": 1610.68,
-          "text": "I really appreciate you keep listening to this whole stuff."
-        },
-        {
-          "index": 285,
-          "start": 1610.9,
-          "end": 1613.08,
-          "text": "I hope it is-- was helpful in some ways."
-        },
-        {
-          "index": 286,
-          "start": 1614.02,
-          "end": 1614.76,
-          "text": "Uh, thank you so much."
-        },
-        {
-          "index": 287,
-          "start": 1614.8,
-          "end": 1615.64,
-          "text": "Thanks for listening."
-        },
-        {
-          "index": 288,
-          "start": 1615.88,
-          "end": 1620.75,
-          "text": "I really appreciate it."
+          "start": 1165.83,
+          "end": 1169.6,
+          "text": "And rightly said, encrypted on it is Armor of God."
         }
       ]
     },
     {
       "id": "Person_2",
-      "name": "Dario Amodei (quoted)",
-      "role": "AI researcher and CEO of Anthropic, quoted in embedded video",
-      "context": "Introduced by the presenter at S7-S8 as CEO of Anthropic and inventor of Claude. Speaks in a video clip from S10-S22 about how AI models want to learn, using philosophical language about removing obstacles.",
-      "total_duration": 41.12,
-      "sentence_count": 13,
+      "name": "Colonel David Devasahayam",
+      "role": "Primary speaker and guest presenter",
+      "context": "Identified by self-introduction as Colonel David, extensive personal narrative about military background, family history, business career, and faith journey. Delivers the main body of the presentation with detailed anecdotes and reflections.",
+      "total_duration": 1065.42,
+      "sentence_count": 132,
       "segments": [
         {
-          "start_sentence_index": 10,
-          "end_sentence_index": 22,
-          "start_time": 40.22,
-          "end_time": 81.34,
-          "duration": 41.12
+          "start_sentence_index": 1,
+          "end_sentence_index": 1,
+          "start_time": 3.2,
+          "end_time": 4.26,
+          "duration": 1.06
+        },
+        {
+          "start_sentence_index": 8,
+          "end_sentence_index": 138,
+          "start_time": 63.26,
+          "end_time": 1127.62,
+          "duration": 1064.36
         }
       ],
-      "full_transcript": "Just before OpenAI started, I met Ilya. One of the first things he said to me was, \"Look, the models, they just wanna learn. You have to understand this. The models, they just wanna learn.\" It was a bit like a Zen koan. Like, I listened to this and, and I became enlightened. The models just wanna learn. You get the obstacles out of their way, right? You give them good data. You give them enough space to operate in. You don't do something stupid like condition them badly numerically, um, and they, they wanna learn. They'll do it. They'll do it. Great. He wasn't talking about student training, he wasn't talking about employee training or plane training, right? He was talking about AI itself.",
+      "full_transcript": "Very, very excited. Thank you for this invitation because it's been such a pleasure listening to all the speakers and especially, uh, Janitha. I mean, as a teenager, what you've been through, I don't think to have been a military man, I would have had the courage to go through the same thing. So thank you for your wonderful testimony and also all the other speakers. I hope I can match up. So my story is different. I belong to a military background. Uh, my, uh, uncle, my father's younger brother, Christudas, was killed in 1962 during the Chinese operation. We're all proud as a family that his name features in the National Memorial at Delhi. My father, uh, joined, uh, the army. He's a World War II veteran in 1944, and thereafter rose from the ranks to retire as a major in the Army Medical Corps. And, uh, my mother is, uh, Karnavathi Devasahayam. She was a school teacher earlier, and thereafter, uh, she was a homemaker. She's a very strict disciplinarian. So my brother John and I, we were schooled in all the places my father was posted all over the country. And, um, so therefore, the far-flung areas, there's not much of churching that was possible, so our home was our church. And, um, I remember two things happened. One is they led exemplary lives, both of them, on Christian values. Our home was built on Christian values. And every Sunday, as a family, we would get together. And just to keep in touch with Tamil, we'd sing only Tamil keithenaigal. So, these were the songs that we sung. And thereafter, my mother would read the Bible and, uh, my father would lead us in prayer. Their lives were their testimony, simple, straightforward Christian lives, and my brother and I were the beneficiaries as a consequence. When I was, uh, fifteen, I decided to join the National Defense Academy. So my father was an outstanding man and, uh, let me tell what lessons they gave us. My mother gave me only one gift. She said, \"You want to join the army? You've got to read Psalm ninety-one every day.\" So sure enough, I was presented with a soldier's Bible in 1976 when I was sixteen. That continues to be with me with it today. And the page on which Psalm ninety-one is there, you will find that, uh, that particular page has, uh, So Psalm ninety-one, I read in some crazy situations, but it's been inspirational for me. My father gave me two pieces of advice. One is said, \"Walk with Jesus and build a working relationship with God.\" He said, \"You may not have a church to go to, you don't have to bend your knees, but you can remain in constant communication with God.\" That's a beautiful message he gave me, which I found one of the most pragmatic pieces of advice for any good Christian. And the second is that you said-- he said, \"You become a Christian on three things, on your thought, thought, word, and deed.\" These have remained with me. I've failed miserably, I know. But, uh, thereafter, just to try the deed part, when I was fifteen and trying for the NDA, my father was an outstanding man. He never drank, but he was a chain smoker. Genuine chain. Chain means you light the next cigarette at the butt of the last one. And my mother used to joke that this man is an advertisement for... his lungs are an advertisement and one lung has written Capstan and on the other is Charminar. Those were the brands those days.And, uh, so I asked my dad, I said, \"If I get through the National Defense Academy, will you stop smoking?\" Now he was for a moment panic-struck, and thereafter he waited a day and the next day he came back to me and said, \"Yes, I'll stop smoking.\" Thereafter, I got through the NDA entrance exam, got through the merit list, the Services Selection Board, I got through the medical exam and finally the joining instructions came. The next day I was to leave for the National Defense Academy. So in the evening we both went for a walk. I found him smoking furiously. You know? And, uh, thereafter, we had a habit of sitting together and having a chat on the lawn. So there were a couple of wicker chairs and we were sitting. So finally around ten thirty he said, \"Son, I think you've got a train to catch tomorrow. I think you should turn in now.\" And he took the cigarette like that and he threw it and he said, \"That's the last cigarette.\" And trust me, he never smoked again. I mean that was for you in terms of keeping your word to a teenage son in terms of his deed. And sure enough, my good mother latched onto it and she said, \"Now you're joining the army,\" when I was joining the army and said, \"So now what is your promise?\" And I promised her that I'll remain a teetotaler and to date I remain a teetotaler despite all these years in uniform. So this photograph you see is when I joined the National Defense Academy. I'd done one term there. From there I was under training and, uh, passed out of the National Defense Academy in nineteen seventy-nine. And nineteen eighty finally it was a very proud moment for my father when I joined the Indian Army at the age of twenty. I joined the Second Battalion of the Eighth Gorkha Rifles and my parents are standing on either side of me and they put the pip on my shoulder and I became a second lieutenant in the Indian Army. Thereafter in the army I was in the Second Eight and those days, uh, the militancies had not really caught on and, uh, it was largely border guarding which we were doing and then peace stations. And so in nineteen eighty-eight after a stint in the infantry school, I decided to double up and a beautiful young lady who had just finished her medicine came into my life, Dr. Renuka David, Renu as we all know her, and she's remained a constant companion. And, uh, you know, an army officer always enjoys working because his wife will take care of the children back home. So that's what she's been for me all my life. So that's a couple of photographs of our wedding followed by this is opening the wedding gifts. Back then teddy bears were in fashion those days. And, uh, then the kids came along. That's Alexander, our elder boy, all in military vehicles. So those days it was a Jonga and by the time my daughter came it became the Gypsy. So that's the time in nineties when the militancy in the valley had really advanced to a large extent and I was the second com-- second in command of my battalion. My daughter had just joined Holy Angels. Renu was here in separation with the children at Nandanum and, uh, I was posted in the Lalab Valley in Kupwara and there was a terrible set of militants at that point of time there. We got information of their hideout. So that day, that fateful day, you know, I used to always have my bulletproof jacket and I had been a paratrooper so my para jacket was there. So I just felt, you know, the para jacket is made of rexine so I took my para jacket, put a couple of magazines in my left pocket and my trusty Bible in my right and we headed out that night. We climbed the hill and on the other side was a suspected hideout. We reached, we were coming down very quietly. All of us were in this position, uh, rounds were in the chamber and we were coming down and, uh, what do we see? Just where this board is I see down below a foreign militant. I mean, he had his beard and he was fast asleep on top of his weapon and all the other fellows were inside. So to cut a long story short, it was a successful shootout and, uh, we were able to eliminate those really nasty militants. And once I saw that my men were safe and they had all taken position, I pulled out my Bible and read Psalm ninety-one. So that's why I said I don't think anyone would have read Psalm ninety-one in the kind of situations I haveA thousand fo-- shall fall at thy side and ten thousand at thy right hand, but it shall not come nigh thee. Only with thine eyes you- thou shall behold the reward of the wicked. In terms of service to the nation, there are different callings. And the calling of a military man in the defense of his nation at times leads him into such situations. So this is a picture of us, a very successful battalion in the valley at that time. And then from there, I got command of a battalion. This was against the Naga militancy. And that's when I was not very happy because they were literally like kids with toy. And I used to tell Renu that I'm not very comfortable here. And I tried to build a vocational training center there because it was largely unemployment that was driving them towards this. And then from there, I got posted to Bangalore as a center commandant of an army training center, the Pioneer Corps Training Center, and that's when I decided along with Renu to make a career transition. So my MBA was in fighting militants, so I was quite unprepared for business. But I had been a commandant for so many years, I had had the independence of command, and so I wanted to be an entrepreneur. So like all good service officers, I thought I'll set up a man guarding services company. But I took a resettlement course because I was taking voluntary retirement. I was getting my full pension. And while I was undergoing that resettlement course, there was a class in the afternoon, a time like this, nobody wants to listen to a lecture. So most of my friends, we were six of us who were attending, so the other five decided not to attend, and I was the only person. And a person came from the RBI and he met me. He said, \"Colonel, if you want to leave, you can. You're most welcome. I'll mark you present.\" I said, \"No, now that you've come, can you have a, can we have a conversation? Tell me what you have to tell me.\" And he told me about cash logistics. And he told me about retail cash management. And he said that there were just a couple of companies who had just started giving retail cash management services in the country. And that got my interest. And from that moment onwards, I started doing all due diligence on retail cash management. And to cut a long story short, today we are the largest retail cash management company in the country. We have-- We work in over thirteen thousand pin codes, and twenty-one percent of our people are ex-servicemen, including the leadership. So we also have taken the public, public, as was announced in January. And with material success has come a keen desire. We've been doing it in small, small amounts, but now a keen desire to move from success to significance. And for me, as I was in the army, the boys who died, they made all the difference. I don't think you will have any idea of the kind of the number of widows that are there right now as we speak. There are fourteen thousand two hundred and fifty-eight widows. Men who either in battle or in battle-connected situations, they have given their lives for the country. And so therefore, we have now an MOU with the army, and as an entrepreneur, it's my great desire, and we have a large number of, uh, former service officers with us, that no child who is, uh, the child of a bereaved widow should lose out on higher education. Of course, we're also in talks with the government with the Prime Minister's scholarship scheme, et cetera. But that's a, that's a commitment of our company to over ensure this. So I know my story is a little different from what you heard so far. I'll just summarize the few minutes that are left. The Bible means different for different people. It's a living word. What Psalm ninety-one means for me, it probably doesn't mean the same for anyone else. But there are other stories, and you heard from our other speakers how... what a living word this is. So draw from it and keep it simple. My father's advice, build a, a working relationship with God. Remain in constant communion with God. Don't put your conscience on silent mode. And the other aspect is that you become a good Christian not by any visible symbols, but by your thoughts, thought, word, and deed. And lastly, the example I gave of somebody from the RBI, when you pray to God, the messenger and the message, we never know from where it will come. So always have complete faith in the Lord, in the Lord and Savior, Jesus Christ. Thank you very much. I'll request my wife, Renu, also to come up on stage. Because she's been as much a part of the entire, my difficult life in the armed forces.",
       "sentences": [
         {
+          "index": 1,
+          "start": 3.2,
+          "end": 4.26,
+          "text": "Very, very excited."
+        },
+        {
+          "index": 8,
+          "start": 63.26,
+          "end": 73.8,
+          "text": "Thank you for this invitation because it's been such a pleasure listening to all the speakers and especially, uh, Janitha."
+        },
+        {
+          "index": 9,
+          "start": 75.64,
+          "end": 81.96,
+          "text": "I mean, as a teenager, what you've been through, I don't think to have been a military man, I would have had the courage to go through the same thing."
+        },
+        {
           "index": 10,
-          "start": 40.22,
-          "end": 42.64,
-          "text": "Just before OpenAI started, I met Ilya."
+          "start": 83.46,
+          "end": 88.78,
+          "text": "So thank you for your wonderful testimony and also all the other speakers."
         },
         {
           "index": 11,
-          "start": 42.7,
-          "end": 45.94,
-          "text": "One of the first things he said to me was, \"Look, the models, they just wanna learn."
+          "start": 89.84,
+          "end": 91.16,
+          "text": "I hope I can match up."
         },
         {
           "index": 12,
-          "start": 46.02,
-          "end": 46.84,
-          "text": "You have to understand this."
+          "start": 93.62,
+          "end": 95.36,
+          "text": "So my story is different."
         },
         {
           "index": 13,
-          "start": 46.9,
-          "end": 49.82,
-          "text": "The models, they just wanna learn.\" It was a bit like a Zen koan."
+          "start": 96.86,
+          "end": 98.4,
+          "text": "I belong to a military background."
         },
         {
           "index": 14,
-          "start": 49.86,
-          "end": 52.16,
-          "text": "Like, I listened to this and, and I became enlightened."
+          "start": 100.84,
+          "end": 114.08,
+          "text": "Uh, my, uh, uncle, my father's younger brother, Christudas, was killed in 1962 during the Chinese operation."
         },
         {
           "index": 15,
-          "start": 54.28,
-          "end": 55.52,
-          "text": "The models just wanna learn."
+          "start": 114.98,
+          "end": 118.86,
+          "text": "We're all proud as a family that his name features in the National Memorial at Delhi."
         },
         {
           "index": 16,
-          "start": 55.56,
-          "end": 59.24,
-          "text": "You get the obstacles out of their way, right? You give them good data."
+          "start": 121.34,
+          "end": 127.98,
+          "text": "My father, uh, joined, uh, the army."
         },
         {
           "index": 17,
-          "start": 59.28,
-          "end": 61.68,
-          "text": "You give them enough space to operate in."
+          "start": 128.22,
+          "end": 138.77,
+          "text": "He's a World War II veteran in 1944, and thereafter rose from the ranks to retire as a major in the Army Medical Corps."
         },
         {
           "index": 18,
-          "start": 62.06,
-          "end": 67.08,
-          "text": "You don't do something stupid like condition them badly numerically, um, and they, they wanna learn."
+          "start": 141.18,
+          "end": 145.08,
+          "text": "And, uh, my mother is, uh, Karnavathi Devasahayam."
         },
         {
           "index": 19,
-          "start": 67.18,
-          "end": 67.76,
-          "text": "They'll do it."
+          "start": 145.72,
+          "end": 151.86,
+          "text": "She was a school teacher earlier, and thereafter, uh, she was a homemaker."
         },
         {
           "index": 20,
-          "start": 67.8,
-          "end": 68.22,
-          "text": "They'll do it."
+          "start": 152.16,
+          "end": 153.72,
+          "text": "She's a very strict disciplinarian."
         },
         {
           "index": 21,
-          "start": 69.0,
-          "end": 70.1,
-          "text": "Great."
+          "start": 155.34,
+          "end": 163.52,
+          "text": "So my brother John and I, we were schooled in all the places my father was posted all over the country."
         },
         {
           "index": 22,
-          "start": 70.36,
-          "end": 81.34,
-          "text": "He wasn't talking about student training, he wasn't talking about employee training or plane training, right? He was talking about AI itself."
+          "start": 165.96,
+          "end": 173.82,
+          "text": "And, um, so therefore, the far-flung areas, there's not much of churching that was possible, so our home was our church."
+        },
+        {
+          "index": 23,
+          "start": 176.14,
+          "end": 180.82,
+          "text": "And, um, I remember two things happened."
+        },
+        {
+          "index": 24,
+          "start": 180.88,
+          "end": 186.22,
+          "text": "One is they led exemplary lives, both of them, on Christian values."
+        },
+        {
+          "index": 25,
+          "start": 186.94,
+          "end": 188.8,
+          "text": "Our home was built on Christian values."
+        },
+        {
+          "index": 26,
+          "start": 189.88,
+          "end": 193.38,
+          "text": "And every Sunday, as a family, we would get together."
+        },
+        {
+          "index": 27,
+          "start": 195.04,
+          "end": 199.16,
+          "text": "And just to keep in touch with Tamil, we'd sing only Tamil keithenaigal."
+        },
+        {
+          "index": 28,
+          "start": 201.18,
+          "end": 208.88,
+          "text": "So, these were the songs that we sung."
+        },
+        {
+          "index": 29,
+          "start": 210.26,
+          "end": 216.42,
+          "text": "And thereafter, my mother would read the Bible and, uh, my father would lead us in prayer."
+        },
+        {
+          "index": 30,
+          "start": 218.46,
+          "end": 227.6,
+          "text": "Their lives were their testimony, simple, straightforward Christian lives, and my brother and I were the beneficiaries as a consequence."
+        },
+        {
+          "index": 31,
+          "start": 229.86,
+          "end": 233.1,
+          "text": "When I was, uh, fifteen, I decided to join the National Defense Academy."
+        },
+        {
+          "index": 32,
+          "start": 235.44,
+          "end": 239.88,
+          "text": "So my father was an outstanding man and, uh, let me tell what lessons they gave us."
+        },
+        {
+          "index": 33,
+          "start": 241.82,
+          "end": 244.8,
+          "text": "My mother gave me only one gift."
+        },
+        {
+          "index": 34,
+          "start": 245.0,
+          "end": 258.3,
+          "text": "She said, \"You want to join the army? You've got to read Psalm ninety-one every day.\" So sure enough, I was presented with a soldier's Bible in 1976 when I was sixteen."
+        },
+        {
+          "index": 35,
+          "start": 259.38,
+          "end": 262.24,
+          "text": "That continues to be with me with it today."
+        },
+        {
+          "index": 36,
+          "start": 263.6,
+          "end": 283.74,
+          "text": "And the page on which Psalm ninety-one is there, you will find that, uh, that particular page has, uh, So Psalm ninety-one, I read in some crazy situations, but it's been inspirational for me."
+        },
+        {
+          "index": 37,
+          "start": 284.74,
+          "end": 286.48,
+          "text": "My father gave me two pieces of advice."
+        },
+        {
+          "index": 38,
+          "start": 288.66,
+          "end": 312.88,
+          "text": "One is said, \"Walk with Jesus and build a working relationship with God.\" He said, \"You may not have a church to go to, you don't have to bend your knees, but you can remain in constant communication with God.\" That's a beautiful message he gave me, which I found one of the most pragmatic pieces of advice for any good Christian."
+        },
+        {
+          "index": 39,
+          "start": 314.68,
+          "end": 328.86,
+          "text": "And the second is that you said-- he said, \"You become a Christian on three things, on your thought, thought, word, and deed.\" These have remained with me."
+        },
+        {
+          "index": 40,
+          "start": 330.38,
+          "end": 332.1,
+          "text": "I've failed miserably, I know."
+        },
+        {
+          "index": 41,
+          "start": 333.56,
+          "end": 346.42,
+          "text": "But, uh, thereafter, just to try the deed part, when I was fifteen and trying for the NDA, my father was an outstanding man."
+        },
+        {
+          "index": 42,
+          "start": 346.48,
+          "end": 348.68,
+          "text": "He never drank, but he was a chain smoker."
+        },
+        {
+          "index": 43,
+          "start": 350.02,
+          "end": 350.78,
+          "text": "Genuine chain."
+        },
+        {
+          "index": 44,
+          "start": 351.44,
+          "end": 354.36,
+          "text": "Chain means you light the next cigarette at the butt of the last one."
+        },
+        {
+          "index": 45,
+          "start": 355.8,
+          "end": 359.12,
+          "text": "And my mother used to joke that this man is an advertisement for..."
+        },
+        {
+          "index": 46,
+          "start": 359.6,
+          "end": 364.72,
+          "text": "his lungs are an advertisement and one lung has written Capstan and on the other is Charminar."
+        },
+        {
+          "index": 47,
+          "start": 366.28,
+          "end": 398.85,
+          "text": "Those were the brands those days.And, uh, so I asked my dad, I said, \"If I get through the National Defense Academy, will you stop smoking?\" Now he was for a moment panic-struck, and thereafter he waited a day and the next day he came back to me and said, \"Yes, I'll stop smoking.\" Thereafter, I got through the NDA entrance exam, got through the merit list, the Services Selection Board, I got through the medical exam and finally the joining instructions came."
+        },
+        {
+          "index": 48,
+          "start": 400.33,
+          "end": 402.83,
+          "text": "The next day I was to leave for the National Defense Academy."
+        },
+        {
+          "index": 49,
+          "start": 405.69,
+          "end": 407.33,
+          "text": "So in the evening we both went for a walk."
+        },
+        {
+          "index": 50,
+          "start": 407.41,
+          "end": 409.01,
+          "text": "I found him smoking furiously."
+        },
+        {
+          "index": 51,
+          "start": 411.49,
+          "end": 419.65,
+          "text": "You know? And, uh, thereafter, we had a habit of sitting together and having a chat on the lawn."
+        },
+        {
+          "index": 52,
+          "start": 420.39,
+          "end": 422.19,
+          "text": "So there were a couple of wicker chairs and we were sitting."
+        },
+        {
+          "index": 53,
+          "start": 423.81,
+          "end": 428.05,
+          "text": "So finally around ten thirty he said, \"Son, I think you've got a train to catch tomorrow."
+        },
+        {
+          "index": 54,
+          "start": 428.15,
+          "end": 442.71,
+          "text": "I think you should turn in now.\" And he took the cigarette like that and he threw it and he said, \"That's the last cigarette.\" And trust me, he never smoked again."
+        },
+        {
+          "index": 55,
+          "start": 446.81,
+          "end": 457.53,
+          "text": "I mean that was for you in terms of keeping your word to a teenage son in terms of his deed."
+        },
+        {
+          "index": 56,
+          "start": 459.09,
+          "end": 474.17,
+          "text": "And sure enough, my good mother latched onto it and she said, \"Now you're joining the army,\" when I was joining the army and said, \"So now what is your promise?\" And I promised her that I'll remain a teetotaler and to date I remain a teetotaler despite all these years in uniform."
+        },
+        {
+          "index": 57,
+          "start": 476.87,
+          "end": 479.95,
+          "text": "So this photograph you see is when I joined the National Defense Academy."
+        },
+        {
+          "index": 58,
+          "start": 480.85,
+          "end": 481.89,
+          "text": "I'd done one term there."
+        },
+        {
+          "index": 59,
+          "start": 482.81,
+          "end": 492.61,
+          "text": "From there I was under training and, uh, passed out of the National Defense Academy in nineteen seventy-nine."
+        },
+        {
+          "index": 60,
+          "start": 494.03,
+          "end": 501.29,
+          "text": "And nineteen eighty finally it was a very proud moment for my father when I joined the Indian Army at the age of twenty."
+        },
+        {
+          "index": 61,
+          "start": 501.95,
+          "end": 512.23,
+          "text": "I joined the Second Battalion of the Eighth Gorkha Rifles and my parents are standing on either side of me and they put the pip on my shoulder and I became a second lieutenant in the Indian Army."
+        },
+        {
+          "index": 62,
+          "start": 514.85,
+          "end": 533.73,
+          "text": "Thereafter in the army I was in the Second Eight and those days, uh, the militancies had not really caught on and, uh, it was largely border guarding which we were doing and then peace stations."
+        },
+        {
+          "index": 63,
+          "start": 536.03,
+          "end": 550.22,
+          "text": "And so in nineteen eighty-eight after a stint in the infantry school, I decided to double up and a beautiful young lady who had just finished her medicine came into my life, Dr."
+        },
+        {
+          "index": 64,
+          "start": 550.39,
+          "end": 556.69,
+          "text": "Renuka David, Renu as we all know her, and she's remained a constant companion."
+        },
+        {
+          "index": 65,
+          "start": 558.79,
+          "end": 565.33,
+          "text": "And, uh, you know, an army officer always enjoys working because his wife will take care of the children back home."
+        },
+        {
+          "index": 66,
+          "start": 566.83,
+          "end": 569.35,
+          "text": "So that's what she's been for me all my life."
+        },
+        {
+          "index": 67,
+          "start": 571.71,
+          "end": 579.57,
+          "text": "So that's a couple of photographs of our wedding followed by this is opening the wedding gifts."
+        },
+        {
+          "index": 68,
+          "start": 581.31,
+          "end": 585.63,
+          "text": "Back then teddy bears were in fashion those days."
+        },
+        {
+          "index": 69,
+          "start": 588.71,
+          "end": 590.39,
+          "text": "And, uh, then the kids came along."
+        },
+        {
+          "index": 70,
+          "start": 590.47,
+          "end": 594.73,
+          "text": "That's Alexander, our elder boy, all in military vehicles."
+        },
+        {
+          "index": 71,
+          "start": 595.85,
+          "end": 600.89,
+          "text": "So those days it was a Jonga and by the time my daughter came it became the Gypsy."
+        },
+        {
+          "index": 72,
+          "start": 603.23,
+          "end": 613.25,
+          "text": "So that's the time in nineties when the militancy in the valley had really advanced to a large extent and I was the second com-- second in command of my battalion."
+        },
+        {
+          "index": 73,
+          "start": 613.31,
+          "end": 615.27,
+          "text": "My daughter had just joined Holy Angels."
+        },
+        {
+          "index": 74,
+          "start": 616.37,
+          "end": 631.95,
+          "text": "Renu was here in separation with the children at Nandanum and, uh, I was posted in the Lalab Valley in Kupwara and there was a terrible set of militants at that point of time there."
+        },
+        {
+          "index": 75,
+          "start": 632.61,
+          "end": 634.65,
+          "text": "We got information of their hideout."
+        },
+        {
+          "index": 76,
+          "start": 636.29,
+          "end": 645.37,
+          "text": "So that day, that fateful day, you know, I used to always have my bulletproof jacket and I had been a paratrooper so my para jacket was there."
+        },
+        {
+          "index": 77,
+          "start": 647.49,
+          "end": 662.89,
+          "text": "So I just felt, you know, the para jacket is made of rexine so I took my para jacket, put a couple of magazines in my left pocket and my trusty Bible in my right and we headed out that night."
+        },
+        {
+          "index": 78,
+          "start": 662.93,
+          "end": 666.87,
+          "text": "We climbed the hill and on the other side was a suspected hideout."
+        },
+        {
+          "index": 79,
+          "start": 669.03,
+          "end": 672.25,
+          "text": "We reached, we were coming down very quietly."
+        },
+        {
+          "index": 80,
+          "start": 672.31,
+          "end": 686.67,
+          "text": "All of us were in this position, uh, rounds were in the chamber and we were coming down and, uh, what do we see? Just where this board is I see down below a foreign militant."
+        },
+        {
+          "index": 81,
+          "start": 689.27,
+          "end": 699.27,
+          "text": "I mean, he had his beard and he was fast asleep on top of his weapon and all the other fellows were inside."
+        },
+        {
+          "index": 82,
+          "start": 702.55,
+          "end": 712.85,
+          "text": "So to cut a long story short, it was a successful shootout and, uh, we were able to eliminate those really nasty militants."
+        },
+        {
+          "index": 83,
+          "start": 714.17,
+          "end": 722.21,
+          "text": "And once I saw that my men were safe and they had all taken position, I pulled out my Bible and read Psalm ninety-one."
+        },
+        {
+          "index": 84,
+          "start": 725.61,
+          "end": 737.44,
+          "text": "So that's why I said I don't think anyone would have read Psalm ninety-one in the kind of situations I haveA thousand fo-- shall fall at thy side and ten thousand at thy right hand, but it shall not come nigh thee."
+        },
+        {
+          "index": 85,
+          "start": 739.02,
+          "end": 743.64,
+          "text": "Only with thine eyes you- thou shall behold the reward of the wicked."
+        },
+        {
+          "index": 86,
+          "start": 746.54,
+          "end": 750.24,
+          "text": "In terms of service to the nation, there are different callings."
+        },
+        {
+          "index": 87,
+          "start": 752.88,
+          "end": 761.56,
+          "text": "And the calling of a military man in the defense of his nation at times leads him into such situations."
+        },
+        {
+          "index": 88,
+          "start": 763.48,
+          "end": 769.6,
+          "text": "So this is a picture of us, a very successful battalion in the valley at that time."
+        },
+        {
+          "index": 89,
+          "start": 770.76,
+          "end": 774.2,
+          "text": "And then from there, I got command of a battalion."
+        },
+        {
+          "index": 90,
+          "start": 775.1,
+          "end": 776.86,
+          "text": "This was against the Naga militancy."
+        },
+        {
+          "index": 91,
+          "start": 777.96,
+          "end": 782.36,
+          "text": "And that's when I was not very happy because they were literally like kids with toy."
+        },
+        {
+          "index": 92,
+          "start": 783.84,
+          "end": 786.28,
+          "text": "And I used to tell Renu that I'm not very comfortable here."
+        },
+        {
+          "index": 93,
+          "start": 787.94,
+          "end": 793.1,
+          "text": "And I tried to build a vocational training center there because it was largely unemployment that was driving them towards this."
+        },
+        {
+          "index": 94,
+          "start": 794.96,
+          "end": 813.47,
+          "text": "And then from there, I got posted to Bangalore as a center commandant of an army training center, the Pioneer Corps Training Center, and that's when I decided along with Renu to make a career transition."
+        },
+        {
+          "index": 95,
+          "start": 816.48,
+          "end": 822.88,
+          "text": "So my MBA was in fighting militants, so I was quite unprepared for business."
+        },
+        {
+          "index": 96,
+          "start": 824.32,
+          "end": 830.68,
+          "text": "But I had been a commandant for so many years, I had had the independence of command, and so I wanted to be an entrepreneur."
+        },
+        {
+          "index": 97,
+          "start": 833.1,
+          "end": 839.82,
+          "text": "So like all good service officers, I thought I'll set up a man guarding services company."
+        },
+        {
+          "index": 98,
+          "start": 840.5,
+          "end": 844.19,
+          "text": "But I took a resettlement course because I was taking voluntary retirement."
+        },
+        {
+          "index": 99,
+          "start": 844.32,
+          "end": 846.2,
+          "text": "I was getting my full pension."
+        },
+        {
+          "index": 100,
+          "start": 848.64,
+          "end": 855.62,
+          "text": "And while I was undergoing that resettlement course, there was a class in the afternoon, a time like this, nobody wants to listen to a lecture."
+        },
+        {
+          "index": 101,
+          "start": 857.86,
+          "end": 864.76,
+          "text": "So most of my friends, we were six of us who were attending, so the other five decided not to attend, and I was the only person."
+        },
+        {
+          "index": 102,
+          "start": 866.06,
+          "end": 873.64,
+          "text": "And a person came from the RBI and he met me."
+        },
+        {
+          "index": 103,
+          "start": 873.66,
+          "end": 875.64,
+          "text": "He said, \"Colonel, if you want to leave, you can."
+        },
+        {
+          "index": 104,
+          "start": 875.68,
+          "end": 876.36,
+          "text": "You're most welcome."
+        },
+        {
+          "index": 105,
+          "start": 876.66,
+          "end": 884.0,
+          "text": "I'll mark you present.\" I said, \"No, now that you've come, can you have a, can we have a conversation? Tell me what you have to tell me.\" And he told me about cash logistics."
+        },
+        {
+          "index": 106,
+          "start": 885.86,
+          "end": 887.74,
+          "text": "And he told me about retail cash management."
+        },
+        {
+          "index": 107,
+          "start": 889.62,
+          "end": 894.37,
+          "text": "And he said that there were just a couple of companies who had just started giving retail cash management services in the country."
+        },
+        {
+          "index": 108,
+          "start": 896.36,
+          "end": 897.64,
+          "text": "And that got my interest."
+        },
+        {
+          "index": 109,
+          "start": 899.36,
+          "end": 904.02,
+          "text": "And from that moment onwards, I started doing all due diligence on retail cash management."
+        },
+        {
+          "index": 110,
+          "start": 905.05,
+          "end": 910.92,
+          "text": "And to cut a long story short, today we are the largest retail cash management company in the country."
+        },
+        {
+          "index": 111,
+          "start": 913.42,
+          "end": 922.88,
+          "text": "We have-- We work in over thirteen thousand pin codes, and twenty-one percent of our people are ex-servicemen, including the leadership."
+        },
+        {
+          "index": 112,
+          "start": 926.56,
+          "end": 932.02,
+          "text": "So we also have taken the public, public, as was announced in January."
+        },
+        {
+          "index": 113,
+          "start": 941.04,
+          "end": 949.74,
+          "text": "And with material success has come a keen desire."
+        },
+        {
+          "index": 114,
+          "start": 950.2,
+          "end": 957.96,
+          "text": "We've been doing it in small, small amounts, but now a keen desire to move from success to significance."
+        },
+        {
+          "index": 115,
+          "start": 961.28,
+          "end": 966.88,
+          "text": "And for me, as I was in the army, the boys who died, they made all the difference."
+        },
+        {
+          "index": 116,
+          "start": 968.12,
+          "end": 972.78,
+          "text": "I don't think you will have any idea of the kind of the number of widows that are there right now as we speak."
+        },
+        {
+          "index": 117,
+          "start": 974.06,
+          "end": 976.34,
+          "text": "There are fourteen thousand two hundred and fifty-eight widows."
+        },
+        {
+          "index": 118,
+          "start": 978.1,
+          "end": 985.38,
+          "text": "Men who either in battle or in battle-connected situations, they have given their lives for the country."
+        },
+        {
+          "index": 119,
+          "start": 987.34,
+          "end": 1006.88,
+          "text": "And so therefore, we have now an MOU with the army, and as an entrepreneur, it's my great desire, and we have a large number of, uh, former service officers with us, that no child who is, uh, the child of a bereaved widow should lose out on higher education."
+        },
+        {
+          "index": 120,
+          "start": 1007.82,
+          "end": 1012.26,
+          "text": "Of course, we're also in talks with the government with the Prime Minister's scholarship scheme, et cetera."
+        },
+        {
+          "index": 121,
+          "start": 1013.78,
+          "end": 1017.04,
+          "text": "But that's a, that's a commitment of our company to over ensure this."
+        },
+        {
+          "index": 122,
+          "start": 1021.2,
+          "end": 1028.01,
+          "text": "So I know my story is a little different from what you heard so far."
+        },
+        {
+          "index": 123,
+          "start": 1029.5,
+          "end": 1032.32,
+          "text": "I'll just summarize the few minutes that are left."
+        },
+        {
+          "index": 124,
+          "start": 1034.76,
+          "end": 1036.72,
+          "text": "The Bible means different for different people."
+        },
+        {
+          "index": 125,
+          "start": 1037.56,
+          "end": 1038.44,
+          "text": "It's a living word."
+        },
+        {
+          "index": 126,
+          "start": 1040.4,
+          "end": 1044.42,
+          "text": "What Psalm ninety-one means for me, it probably doesn't mean the same for anyone else."
+        },
+        {
+          "index": 127,
+          "start": 1045.38,
+          "end": 1049.66,
+          "text": "But there are other stories, and you heard from our other speakers how..."
+        },
+        {
+          "index": 128,
+          "start": 1049.72,
+          "end": 1050.92,
+          "text": "what a living word this is."
+        },
+        {
+          "index": 129,
+          "start": 1051.84,
+          "end": 1053.64,
+          "text": "So draw from it and keep it simple."
+        },
+        {
+          "index": 130,
+          "start": 1056.48,
+          "end": 1064.12,
+          "text": "My father's advice, build a, a working relationship with God."
+        },
+        {
+          "index": 131,
+          "start": 1064.8,
+          "end": 1066.66,
+          "text": "Remain in constant communion with God."
+        },
+        {
+          "index": 132,
+          "start": 1067.6,
+          "end": 1069.32,
+          "text": "Don't put your conscience on silent mode."
+        },
+        {
+          "index": 133,
+          "start": 1073.24,
+          "end": 1084.72,
+          "text": "And the other aspect is that you become a good Christian not by any visible symbols, but by your thoughts, thought, word, and deed."
+        },
+        {
+          "index": 134,
+          "start": 1087.54,
+          "end": 1098.78,
+          "text": "And lastly, the example I gave of somebody from the RBI, when you pray to God, the messenger and the message, we never know from where it will come."
+        },
+        {
+          "index": 135,
+          "start": 1101.6,
+          "end": 1107.98,
+          "text": "So always have complete faith in the Lord, in the Lord and Savior, Jesus Christ."
+        },
+        {
+          "index": 136,
+          "start": 1109.1,
+          "end": 1109.84,
+          "text": "Thank you very much."
+        },
+        {
+          "index": 137,
+          "start": 1116.36,
+          "end": 1119.04,
+          "text": "I'll request my wife, Renu, also to come up on stage."
+        },
+        {
+          "index": 138,
+          "start": 1121.42,
+          "end": 1127.62,
+          "text": "Because she's been as much a part of the entire, my difficult life in the armed forces."
         }
       ]
     },
     {
       "id": "Person_3",
-      "name": "Bank Advisor (role-play character)",
-      "role": "Customer service representative in AI role-play demo",
-      "context": "Appears in a customer service role-play scenario from S100-S115, responding to a customer (Mr. Gecko) about banking services. Distinct voice in back-and-forth dialogue demonstrating synchronous job training.",
-      "total_duration": 32.92,
-      "sentence_count": 11,
+      "name": "Audience / Event Staff",
+      "role": "Audience members and event support staff providing brief acknowledgments",
+      "context": "Identified by very brief interjections and thank you remarks at the end of Colonel David's speech, including 'Thank you, sir' and 'Sure, sure, sure' responses during the closing segment.",
+      "total_duration": 18.8,
+      "sentence_count": 7,
       "segments": [
         {
-          "start_sentence_index": 103,
-          "end_sentence_index": 113,
-          "start_time": 591.88,
-          "end_time": 624.8,
-          "duration": 32.92
+          "start_sentence_index": 139,
+          "end_sentence_index": 143,
+          "start_time": 1128.58,
+          "end_time": 1146.84,
+          "duration": 18.26
+        },
+        {
+          "start_sentence_index": 146,
+          "end_sentence_index": 146,
+          "start_time": 1153.16,
+          "end_time": 1153.3,
+          "duration": 0.14
+        },
+        {
+          "start_sentence_index": 152,
+          "end_sentence_index": 152,
+          "start_time": 1170.54,
+          "end_time": 1170.94,
+          "duration": 0.4
         }
       ],
-      "full_transcript": "Gecko, we really value your loyalty, and you know, our relationship means a great deal to us. We're, uh, fully committed to making this work. Yeah, but- Look, Citi's rate is a teaser. Expires in ninety days. Yours doesn't. How do you know their rate expires? Because, uh, I've kept three hundred and forty clients who almost made that exact mistake. What about the dedicated advisor? You're talking to him, actually. Same number, Sundays included. And the biscuits? Done. On your desk by Thursday. Imported.",
+      "full_transcript": "Thank you, sir. Thank you, sir. Thank you. Please. Check. Sure, sure, sure. Thank you, sir.",
       "sentences": [
         {
-          "index": 103,
-          "start": 591.88,
-          "end": 597.32,
-          "text": "Gecko, we really value your loyalty, and you know, our relationship means a great deal to us."
+          "index": 139,
+          "start": 1128.58,
+          "end": 1128.75,
+          "text": "Thank you, sir."
         },
         {
-          "index": 104,
-          "start": 597.82,
-          "end": 600.48,
-          "text": "We're, uh, fully committed to making this work."
+          "index": 140,
+          "start": 1128.75,
+          "end": 1128.75,
+          "text": "Thank you, sir."
         },
         {
-          "index": 105,
-          "start": 600.98,
-          "end": 604.24,
-          "text": "Yeah, but- Look, Citi's rate is a teaser."
+          "index": 141,
+          "start": 1128.75,
+          "end": 1131.34,
+          "text": "Thank you."
         },
         {
-          "index": 106,
-          "start": 604.3,
-          "end": 605.62,
-          "text": "Expires in ninety days."
+          "index": 142,
+          "start": 1135.29,
+          "end": 1146.48,
+          "text": "Please."
         },
         {
-          "index": 107,
-          "start": 605.92,
-          "end": 606.44,
-          "text": "Yours doesn't."
+          "index": 143,
+          "start": 1146.58,
+          "end": 1146.84,
+          "text": "Check."
         },
         {
-          "index": 108,
-          "start": 607.14,
-          "end": 614.18,
-          "text": "How do you know their rate expires? Because, uh, I've kept three hundred and forty clients who almost made that exact mistake."
+          "index": 146,
+          "start": 1153.16,
+          "end": 1153.3,
+          "text": "Sure, sure, sure."
         },
         {
-          "index": 109,
-          "start": 614.58,
-          "end": 617.98,
-          "text": "What about the dedicated advisor? You're talking to him, actually."
-        },
-        {
-          "index": 110,
-          "start": 618.34,
-          "end": 620.0,
-          "text": "Same number, Sundays included."
-        },
-        {
-          "index": 111,
-          "start": 620.48,
-          "end": 622.37,
-          "text": "And the biscuits? Done."
-        },
-        {
-          "index": 112,
-          "start": 622.86,
-          "end": 623.98,
-          "text": "On your desk by Thursday."
-        },
-        {
-          "index": 113,
-          "start": 624.34,
-          "end": 624.8,
-          "text": "Imported."
-        }
-      ]
-    },
-    {
-      "id": "Person_4",
-      "name": "Mr. Gecko (role-play character)",
-      "role": "Customer in AI role-play demo",
-      "context": "Appears in customer service role-play scenario from S100-S115, playing a customer considering switching banks. Distinct voice in back-and-forth dialogue with the bank advisor.",
-      "total_duration": 17.74,
-      "sentence_count": 5,
-      "segments": [
-        {
-          "start_sentence_index": 100,
-          "end_sentence_index": 102,
-          "start_time": 576.7,
-          "end_time": 591.62,
-          "duration": 14.92
-        },
-        {
-          "start_sentence_index": 114,
-          "end_sentence_index": 115,
-          "start_time": 625.68,
-          "end_time": 628.5,
-          "duration": 2.82
-        }
-      ],
-      "full_transcript": "Listen, Citibank has been after my business for a while now. They're offering me better rates, a dedicated advisor, and frankly, better biscuits at their branch. So tell me, why should I stay? Uh, Mr. Yeah, all right. I'll cancel the Citi meeting then.",
-      "sentences": [
-        {
-          "index": 100,
-          "start": 576.7,
-          "end": 580.16,
-          "text": "Listen, Citibank has been after my business for a while now."
-        },
-        {
-          "index": 101,
-          "start": 580.68,
-          "end": 587.26,
-          "text": "They're offering me better rates, a dedicated advisor, and frankly, better biscuits at their branch."
-        },
-        {
-          "index": 102,
-          "start": 588.2,
-          "end": 591.62,
-          "text": "So tell me, why should I stay? Uh, Mr."
-        },
-        {
-          "index": 114,
-          "start": 625.68,
-          "end": 626.28,
-          "text": "Yeah, all right."
-        },
-        {
-          "index": 115,
-          "start": 626.46,
-          "end": 628.5,
-          "text": "I'll cancel the Citi meeting then."
-        }
-      ]
-    },
-    {
-      "id": "Person_5",
-      "name": "Training Avatar (AI character)",
-      "role": "Avatar instructor in course design framework video",
-      "context": "Appears in embedded video from S156-S199 introducing herself as a trainer and providing a framework for choosing course formats. Distinct voice and perspective from the main presenter, speaking directly to learners about course design.",
-      "total_duration": 172.94,
-      "sentence_count": 44,
-      "segments": [
-        {
-          "start_sentence_index": 156,
-          "end_sentence_index": 199,
-          "start_time": 893.78,
-          "end_time": 1066.72,
-          "duration": 172.94
-        }
-      ],
-      "full_transcript": "Hey, I am a trainer just like you. And honestly, one of the biggest questions I kept asking myself when I started designing courses was, what format should I even use? Should I do a PowerPoint, a video, role play, games, quizzes, microlearning? The options felt overwhelming and picking the wrong one, that can kill engagement completely. So today, I am going to give you a simple framework to pick the right course style every single time. Here's the first mistake most trainers make, including me. We pick the format we enjoy creating, not the format our learners actually need. So before you choose anything, ask yourself three questions. Who is your learner? What do they need to do after this training? And where will they consume it? Everything flows from those three answers. Let me quickly walk you through when to use each format. PowerPoint or slides. Use this for concept-heavy content like policies or data. Keep it structured and add interaction. Video. Use video for demos or storytelling. Keep it short, clear, and focused. Role play. Use role play when learners need to practice real-world skills. Microlearning. Great for busy learners. Keep it short and focused on one idea. Interactive games. Use games to boost engagement, motivation, and repeated practice. Quizzes. Use quizzes to reinforce learning at the start or end of a training module. Okay, so here's the simple framework I use every time I design a course. Ask yourself three questions. Question one. Is this about knowledge or skill? For knowledge, use slides, video, or microlearning. For skill, use role play, games, or simulations. Question two. How motivated is your learner? If motivation is high, most formats work. If it's low, use games or interactive content. Question three. How much time do they have? If they have time, use videos or role play. If time is limited, use microlearning or quick quizzes. Run any topic through these questions and the right format becomes clear. Here's the truth. There is no single perfect format. The best trainers mix and match. Start with your learner's need. Match the format to the outcome. And don't be afraid to blend. A short video followed by a quiz followed by a role play? That's a powerful learning journey. You don't need to pick one style. All right.",
-      "sentences": [
-        {
-          "index": 156,
-          "start": 893.78,
-          "end": 895.62,
-          "text": "Hey, I am a trainer just like you."
-        },
-        {
-          "index": 157,
-          "start": 896.42,
-          "end": 920.68,
-          "text": "And honestly, one of the biggest questions I kept asking myself when I started designing courses was, what format should I even use? Should I do a PowerPoint, a video, role play, games, quizzes, microlearning? The options felt overwhelming and picking the wrong one, that can kill engagement completely."
-        },
-        {
-          "index": 158,
-          "start": 922.02,
-          "end": 930.0,
-          "text": "So today, I am going to give you a simple framework to pick the right course style every single time."
-        },
-        {
-          "index": 159,
-          "start": 931.46,
-          "end": 935.04,
-          "text": "Here's the first mistake most trainers make, including me."
-        },
-        {
-          "index": 160,
-          "start": 936.18,
-          "end": 941.22,
-          "text": "We pick the format we enjoy creating, not the format our learners actually need."
-        },
-        {
-          "index": 161,
-          "start": 942.6,
-          "end": 946.18,
-          "text": "So before you choose anything, ask yourself three questions."
-        },
-        {
-          "index": 162,
-          "start": 947.44,
-          "end": 956.86,
-          "text": "Who is your learner? What do they need to do after this training? And where will they consume it? Everything flows from those three answers."
-        },
-        {
-          "index": 163,
-          "start": 959.18,
-          "end": 962.08,
-          "text": "Let me quickly walk you through when to use each format."
-        },
-        {
-          "index": 164,
-          "start": 962.98,
-          "end": 964.14,
-          "text": "PowerPoint or slides."
-        },
-        {
-          "index": 165,
-          "start": 964.44,
-          "end": 967.46,
-          "text": "Use this for concept-heavy content like policies or data."
-        },
-        {
-          "index": 166,
-          "start": 967.98,
-          "end": 970.02,
-          "text": "Keep it structured and add interaction."
-        },
-        {
-          "index": 167,
-          "start": 971.04,
-          "end": 971.46,
-          "text": "Video."
-        },
-        {
-          "index": 168,
-          "start": 971.74,
-          "end": 973.66,
-          "text": "Use video for demos or storytelling."
-        },
-        {
-          "index": 169,
-          "start": 974.2,
-          "end": 976.09,
-          "text": "Keep it short, clear, and focused."
-        },
-        {
-          "index": 170,
-          "start": 977.4,
-          "end": 977.98,
-          "text": "Role play."
-        },
-        {
-          "index": 171,
-          "start": 978.38,
-          "end": 981.48,
-          "text": "Use role play when learners need to practice real-world skills."
-        },
-        {
-          "index": 172,
-          "start": 982.54,
-          "end": 983.26,
-          "text": "Microlearning."
-        },
-        {
-          "index": 173,
-          "start": 983.54,
-          "end": 984.66,
-          "text": "Great for busy learners."
-        },
-        {
-          "index": 174,
-          "start": 984.9,
-          "end": 986.96,
-          "text": "Keep it short and focused on one idea."
-        },
-        {
-          "index": 175,
-          "start": 987.98,
-          "end": 989.08,
-          "text": "Interactive games."
-        },
-        {
-          "index": 176,
-          "start": 989.54,
-          "end": 993.22,
-          "text": "Use games to boost engagement, motivation, and repeated practice."
-        },
-        {
-          "index": 177,
-          "start": 994.18,
-          "end": 994.58,
-          "text": "Quizzes."
-        },
-        {
-          "index": 178,
-          "start": 995.45,
-          "end": 999.14,
-          "text": "Use quizzes to reinforce learning at the start or end of a training module."
-        },
-        {
-          "index": 179,
-          "start": 999.36,
-          "end": 1003.3,
-          "text": "Okay, so here's the simple framework I use every time I design a course."
-        },
-        {
-          "index": 180,
-          "start": 1004.84,
-          "end": 1006.26,
-          "text": "Ask yourself three questions."
-        },
-        {
-          "index": 181,
-          "start": 1007.24,
-          "end": 1007.9,
-          "text": "Question one."
-        },
-        {
-          "index": 182,
-          "start": 1008.92,
-          "end": 1014.62,
-          "text": "Is this about knowledge or skill? For knowledge, use slides, video, or microlearning."
-        },
-        {
-          "index": 183,
-          "start": 1015.16,
-          "end": 1018.26,
-          "text": "For skill, use role play, games, or simulations."
-        },
-        {
-          "index": 184,
-          "start": 1019.4,
-          "end": 1020.2,
-          "text": "Question two."
-        },
-        {
-          "index": 185,
-          "start": 1020.3,
-          "end": 1024.74,
-          "text": "How motivated is your learner? If motivation is high, most formats work."
-        },
-        {
-          "index": 186,
-          "start": 1024.78,
-          "end": 1027.34,
-          "text": "If it's low, use games or interactive content."
-        },
-        {
-          "index": 187,
-          "start": 1028.68,
-          "end": 1029.32,
-          "text": "Question three."
-        },
-        {
-          "index": 188,
-          "start": 1029.86,
-          "end": 1033.66,
-          "text": "How much time do they have? If they have time, use videos or role play."
-        },
-        {
-          "index": 189,
-          "start": 1034.38,
-          "end": 1037.5,
-          "text": "If time is limited, use microlearning or quick quizzes."
-        },
-        {
-          "index": 190,
-          "start": 1037.88,
-          "end": 1041.74,
-          "text": "Run any topic through these questions and the right format becomes clear."
-        },
-        {
-          "index": 191,
-          "start": 1041.88,
-          "end": 1042.6,
-          "text": "Here's the truth."
-        },
-        {
-          "index": 192,
-          "start": 1043.22,
-          "end": 1045.02,
-          "text": "There is no single perfect format."
-        },
-        {
-          "index": 193,
-          "start": 1045.76,
-          "end": 1047.44,
-          "text": "The best trainers mix and match."
-        },
-        {
-          "index": 194,
-          "start": 1048.4,
-          "end": 1049.66,
-          "text": "Start with your learner's need."
-        },
-        {
-          "index": 195,
-          "start": 1050.3,
-          "end": 1051.74,
-          "text": "Match the format to the outcome."
-        },
-        {
-          "index": 196,
-          "start": 1052.44,
-          "end": 1053.74,
-          "text": "And don't be afraid to blend."
-        },
-        {
-          "index": 197,
-          "start": 1054.34,
-          "end": 1061.54,
-          "text": "A short video followed by a quiz followed by a role play? That's a powerful learning journey."
-        },
-        {
-          "index": 198,
-          "start": 1061.7,
-          "end": 1063.94,
-          "text": "You don't need to pick one style."
-        },
-        {
-          "index": 199,
-          "start": 1066.52,
-          "end": 1066.72,
-          "text": "All right."
+          "index": 152,
+          "start": 1170.54,
+          "end": 1170.94,
+          "text": "Thank you, sir."
         }
       ]
     }

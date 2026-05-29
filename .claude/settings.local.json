@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python lfts.py)"
+      "Bash(python lfts.py)",
+      "Bash(CLAUDE_API_KEY=dummy python -c ' *)"
     ]
   }
 }
