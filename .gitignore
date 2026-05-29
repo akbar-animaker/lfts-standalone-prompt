@@ -221,3 +221,8 @@ __marimo__/
 
 # Local runtime config (contains API key) — never commit
 storage/config.json
+
+# Files downloaded per project (transcript + video)
+storage/downloads/
+
+.claudia/
