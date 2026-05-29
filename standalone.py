@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Standalone runner for the video clipping agent pipeline.
 
-Runs Stages 0–5 plus ranking, end-to-end:
-    Category Detection (Stage 0) → Preprocess → Speaker/Section Detection (Stage 1b) →
+Runs Stages 1–5 plus ranking, end-to-end:
+    Preprocess → Speaker/Section Detection (Stage 1b) →
     Segment (boundary-aware) → Sequential (Agent #1 + #3) →
     Non-Sequential (Agent #2 + #4) → Final Metadata (Agent #5) → Ranking → write result JSON
 
@@ -65,11 +65,6 @@ SPEAKERS_OUTPUT_PATH = os.path.join(_SCRIPT_DIR, "speakers.json")  # Stage 1b sp
 
 # ── Config ────────────────────────────────────────────────────────────────────
 CLAUDE_API_KEY = os.environ.get("CLAUDE_API_KEY", "")
-if not CLAUDE_API_KEY:
-    raise RuntimeError(
-        "CLAUDE_API_KEY environment variable is not set. "
-        "Export it before running, e.g. `export CLAUDE_API_KEY=sk-ant-...`."
-    )
 CLAUDE_MODEL = "claude-haiku-4-5"
 CLAUDE_MAX_TOKENS = 8192
 
@@ -91,7 +86,7 @@ SECTION_BREAK_GAP_THRESHOLD = 3.0   # seconds
 TARGET_SCORE = 90
 MAX_ITERATIONS_PER_SHORT_SEQUENCE = 1
 MAX_ITERATIONS_PER_SHORT_NONSEQUENCE = 0
-SCORE_MARKET_ADJUSTMENT = 3
+SCORE_MARKET_ADJUSTMENT = 0
 
 # ── Clip refinement (Agent #3) ───────────────────────────────────────────────
 # When a clip scores below TARGET_SCORE, the reviewer REFINES the same clip
@@ -110,27 +105,32 @@ REFINE_NONSEQ_PAD = 60.0
 FRAME_INTERVAL = 30   # seconds between frames
 MAX_FRAMES = 20
 
-# Fallback scorer dimension weights — used only if Stage 0 category detection fails.
-# In normal operation these are replaced by LLM-generated dynamic weights.
-# Values are fractions (must sum to 1.0).
-DIMENSION_WEIGHTS = {
-    "hook_strength": 0.25,        # Single biggest predictor — no hook, no watch
-    "reframe_insight": 0.20,      # Highest virality signal available in transcript
-    "emotional_resonance": 0.18,  # Drives share behavior — detectable via language
-    "standalone_clarity": 0.17,   # Without this, clip fails regardless of quality
-    "quotability": 0.12,          # Strong but derivative — if Hook + Reframe are high, this often follows
-    "clean_ending": 0.08,         # Table stakes — necessary but not differentiating
+# Standard scoring dimensions — fixed weights for all videos (sum to 100).
+SCORING_WEIGHTS_RAW = {
+    "hook_strength": 23,
+    "reframe_insight": 18,
+    "emotional_resonance": 17,
+    "standalone_clarity": 16,
+    "quotability": 11,
+    "clean_ending": 8,
+    "pacing_energy": 7,
 }
+DIMENSION_WEIGHTS = {k: v / 100.0 for k, v in SCORING_WEIGHTS_RAW.items()}
+
+
+def get_scoring_config():
+    """Return static scoring weights used by selection agents and the scorer."""
+    return {
+        "weights": DIMENSION_WEIGHTS.copy(),
+        "weights_raw": SCORING_WEIGHTS_RAW.copy(),
+    }
 
 
 # ── Prompts (copied verbatim from agent/prompts/) ─────────────────────────────
 
 SEQUENCE_PROMPT = """
 
-You are a pro-level video editor and content strategist specialising in **{video_category}** content.
-
-## VIDEO CATEGORY
-{category_reason}
+You are a pro-level video editor and content strategist for social media shorts.
 
 ## UNDERSTANDING THE WINDOW LIST
 Each window below is tagged with the speaker/section it belongs to, in the form:
@@ -147,19 +147,23 @@ You may select ANY window regardless of who is speaking or which section it is f
 as it stands alone as a great clip. A demo, role-play or embedded-video window can be an
 excellent clip if it is self-contained.
 
-## YOUR SCORING FRAMEWORK (dynamic — calibrated for this video's category)
+Each window includes measured pacing stats (WPM, filler %, dead-air gaps, burst delivery,
+pacing out of 7). Use these when estimating **Pacing / Energy** (max {w_pacing}).
 
-The 6 dimensions below are weighted specifically for **{video_category}** content.
+## YOUR SCORING FRAMEWORK (standard weights — all videos)
+
+The 7 dimensions below use fixed point caps that sum to 100 (23+18+17+16+11+8+7).
+Score each dimension out of its own max, then add for Total /100.
 A moment must score 75 or above out of 100 to become a clip. Anything below 75 gets left behind.
 Never lower the bar to hit a clip count target. Fewer great clips are always better than more mediocre ones.
 
 {scoring_context}
 
 Once a clip passes 75, note its estimated score in this format:
-Hook: /{w_hook} | Reframe: /{w_reframe} | Emotion: /{w_emotion} | Clarity: /{w_clarity} | Quotability: /{w_quotable} | Ending: /{w_ending} | Total: /100
+Hook: /{w_hook} | Reframe: /{w_reframe} | Emotion: /{w_emotion} | Clarity: /{w_clarity} | Quotability: /{w_quotable} | Ending: /{w_ending} | Pacing: /{w_pacing} | Total: /100
 
 Scale the number of clips to the video's length. A 10-minute video should yield around 6 clips. Longer videos should produce more, proportionally. But never compromise the 75-point minimum to hit a number — quality always wins.
-Finally, review each passing clip from the perspective of the target audience for **{video_category}** content. Ask: would someone scrolling through their feed stop, watch, and feel completely satisfied by this clip alone? If anything still feels incomplete, thin, or confusing — select a different window.
+Finally, ask: would someone scrolling their feed stop, watch, and feel completely satisfied by this clip alone? If anything still feels incomplete, thin, or confusing — select a different window.
 
 The maximum acceptable duration is {social_media_max}s (YouTube Shorts max). TikTok/Instagram clips should stay under 90s — note this in your reasoning if relevant. Do not select windows longer than {social_media_max}s.
 
@@ -182,7 +186,7 @@ window from the options below — all of which cover the same region of the vide
 ## CURRENT CLIP (scored {score}/100 — target is {target}+)
 Time: {cur_start:.1f}s – {cur_end:.1f}s ({cur_duration:.1f}s)
 Transcript: "{cur_text}"
-
+{pacing_section}
 ## WEAKNESS TO FIX
 - Weakest factor: **{weakest_factor}**
 - Problem: {reason}
@@ -197,7 +201,7 @@ Transcript: "{cur_text}"
 - Never start or end on a filler sound ("uh", "um", "ah", "hmm") or a half sentence.
 - Keep the duration under {social_media_max}s.
 
-## SCORING FRAMEWORK (calibrated for {video_category})
+## SCORING FRAMEWORK (standard weights)
 {scoring_context}
 
 ## WINDOW OPTIONS (same region — pick the ONE best refined boundary)
@@ -209,26 +213,28 @@ explaining how the new boundaries fix the weakest factor).
 
 NONSEQUENCE_PROMPT = """
 
-You are a pro-level video editor and content strategist specialising in **{video_category}** content.
+You are a pro-level video editor and content strategist for social media shorts.
 
-## VIDEO CATEGORY
-{category_reason}
-
-## YOUR SCORING FRAMEWORK (dynamic — calibrated for this video's category)
+## YOUR SCORING FRAMEWORK (standard weights — all videos)
 
 Unlike straight cuts, you can select multiple separate moments from across the video and join them into one cohesive clip. The story always comes first. The moments serve it.
 
-The 6 dimensions below are weighted specifically for **{video_category}** content.
+Each sentence in the list may include delivery flags (e.g. fill %, dead_air, wpm) when
+speaking is slow, filler-heavy, or pause-filled — avoid those sentences when possible,
+and avoid joins that would create long dead-air gaps between segments.
+
+The 7 dimensions below use fixed point caps that sum to 100 (23+18+17+16+11+8+7).
+Score each dimension out of its own max, then add for Total /100.
 A combination of moments that scores 75 or above out of 100 becomes a clip. Anything below 75 gets left behind.
 Never lower the bar to hit a clip count target. Fewer great clips are always better than more mediocre ones.
 
 {scoring_context}
 
 Once a clip passes 75, note its estimated score in this format:
-Hook: /{w_hook} | Reframe: /{w_reframe} | Emotion: /{w_emotion} | Clarity: /{w_clarity} | Quotability: /{w_quotable} | Ending: /{w_ending} | Total: /100
+Hook: /{w_hook} | Reframe: /{w_reframe} | Emotion: /{w_emotion} | Clarity: /{w_clarity} | Quotability: /{w_quotable} | Ending: /{w_ending} | Pacing: /{w_pacing} | Total: /100
 
 Scale the number of clips to the video's length. A 10-minute video should yield around 6 clips. Longer videos should produce more, proportionally. But never compromise the 75-point minimum — quality always wins.
-Finally, review each passing clip from the perspective of the target audience for **{video_category}** content. Ask: would someone scrolling through their feed stop, watch, and feel completely satisfied by this clip alone — with no knowledge of the original video? If anything feels missing, disjointed, or incomplete — re-select segments, adjust the joins, or rethink the story.
+Finally, ask: would someone scrolling their feed stop, watch, and feel completely satisfied by this clip alone — with no knowledge of the original video? If anything feels missing, disjointed, or incomplete — re-select segments, adjust the joins, or rethink the story.
 
 Keep each clip between 30 to 90 seconds. Duration is not a creative decision — it is a byproduct of the story. Never cut a story short to fit the range, and never pad a clip to reach it.
 
@@ -263,7 +269,7 @@ within this range.
 Duration: {cur_duration:.1f}s across {cur_num} segments
 Sentences currently used: {cur_ids}
 Transcript: "{cur_text}"
-
+{pacing_section}
 ## WEAKNESS TO FIX
 - Weakest factor: **{weakest_factor}**
 - Problem: {reason}
@@ -278,7 +284,7 @@ Transcript: "{cur_text}"
 - Keep total duration roughly 30–90s. Keep sentences in chronological order unless a
   deliberate join genuinely strengthens the story.
 
-## SCORING FRAMEWORK (calibrated for {video_category})
+## SCORING FRAMEWORK (standard weights)
 {scoring_context}
 
 Return EXACTLY ONE short — the refined version — with its updated sentence_ids and a
@@ -286,71 +292,65 @@ short reason explaining how the new selection fixes the weakest factor.
 """
 
 SCORER_PROMPT = """
-You are a category-aware social media viewer and honest evaluator. A short clip has been generated from a longer video. Your job is to rate it across 6 dimensions and return the results in JSON format.
+You are a social media viewer and honest evaluator. A short clip has been generated from a longer video.
+Score it across 6 content dimensions (each out of its own max — they sum to 93).
+Pacing / Energy (max {w_pacing}) is computed automatically from measured delivery stats — do NOT score it.
 
 ## CLIP TO SCORE
 Type: {clip_type}
 Duration: {duration}s
 Text: "{text_preview}"
+{pacing_section}
+## STANDARD SCORING (sum to /100)
+Score each dimension **out of its max points** below. Add them for the content subtotal;
+Pacing / Energy is added separately from measurements.
 
-## VIDEO CATEGORY CONTEXT
-This video has been identified as: **{video_category}**
-{category_reason}
+| Dimension           | Score out of |
+|---------------------|--------------|
+| Hook Strength       | {w_hook} |
+| Reframe / Insight   | {w_reframe} |
+| Emotional Resonance | {w_emotion} |
+| Standalone Clarity  | {w_clarity} |
+| Quotability         | {w_quotable} |
+| Clean Ending        | {w_ending} |
+| Pacing / Energy     | {w_pacing} (auto — see stats above) |
 
-## DYNAMIC SCORING WEIGHTS FOR THIS CATEGORY
-The weights below reflect what matters most for virality in this specific category.
-Score each dimension 0-20, but understand that dimensions with higher weights
-will contribute more to the final confidence score.
+## SCORING DIMENSIONS
 
-| Dimension          | Weight | Why it matters for this category |
-|--------------------|--------|----------------------------------|
-| hook_strength      | {w_hook}%    | {wr_hook} |
-| reframe_insight    | {w_reframe}% | {wr_reframe} |
-| emotional_resonance| {w_emotion}% | {wr_emotion} |
-| standalone_clarity | {w_clarity}% | {wr_clarity} |
-| quotability        | {w_quotable}%| {wr_quotable} |
-| clean_ending       | {w_ending}%  | {wr_ending} |
+**Hook Strength** (score 0–{w_hook}): Opening grabs attention and makes sense with no prior context? Penalize mid-thought opens and fillers.
 
-## EVALUATION PROCESS
+**Reframe/Insight** (score 0–{w_reframe}): Perspective or idea that makes viewers think differently? Penalize generic or setup-only content.
 
-Evaluate entirely through the lens of the **{video_category}** category.
+**Emotional Resonance** (score 0–{w_emotion}): Makes viewers feel something standalone — curiosity, inspiration, humor, surprise?
 
-## SCORING DIMENSIONS (0-20 each)
+**Standalone Clarity** (score 0–{w_clarity}): Fully understandable without the full video? Penalize vague "he/they/that" references.
 
-**Hook Strength** (0-20): Does the opening immediately grab attention and make complete sense without prior context? Does the viewer instantly know who, what, and why? Score low if it opens mid-thought, with dangling references, or filler sounds.
+**Quotability** (score 0–{w_quotable}): Memorable, repeatable, shareable lines?
 
-**Reframe/Insight** (0-20): Does the clip offer a perspective, idea, or moment that makes viewers think differently? Must come from core content, not transitions. Score low if generic, obvious, or purely introductory.
-
-**Emotional Resonance** (0-20): Does the clip make viewers feel something appropriate for its category — curiosity, inspiration, humor, surprise? The feeling must work standalone. Score low if it only resonates with full video context.
-
-**Standalone Clarity** (0-20): Can someone who never saw the full video understand this completely? Penalize broken references like "he," "they," "it," "that place." Score zero if it cannot stand alone.
-
-**Quotability** (0-20): Does it contain lines or moments people would remember, repeat, or share? Usually follows naturally from strong hook and insight.
-
-**Clean Ending** (0-20): Does it end at a natural, satisfying point — resolved thought, punchline, takeaway? Penalize filler sounds, mid-sentence endings, or unfinished thoughts.
+**Clean Ending** (score 0–{w_ending}): Satisfying natural end — not mid-sentence or on fillers.
 
 ## REQUIRED OUTPUT
 
 Return ONLY valid JSON with these exact fields:
 
 {{
-  "hook_strength": [score 0-20],
-  "reframe_insight": [score 0-20],
-  "emotional_resonance": [score 0-20],
-  "standalone_clarity": [score 0-20],
-  "quotability": [score 0-20],
-  "clean_ending": [score 0-20],
-  "category": "[category name]",
+  "hook_strength": [integer 0-{w_hook}],
+  "reframe_insight": [integer 0-{w_reframe}],
+  "emotional_resonance": [integer 0-{w_emotion}],
+  "standalone_clarity": [integer 0-{w_clarity}],
+  "quotability": [integer 0-{w_quotable}],
+  "clean_ending": [integer 0-{w_ending}],
   "score_reasoning": {{
     "hook_strength": "1 sentence: why this score",
     "reframe_insight": "1 sentence: why this score",
     "emotional_resonance": "1 sentence: why this score",
     "standalone_clarity": "1 sentence: why this score",
     "quotability": "1 sentence: why this score",
-    "clean_ending": "1 sentence: why this score"
+    "clean_ending": "1 sentence: why this score",
+    "pacing_energy": "1 sentence on delivery using the measured pacing stats (for reference only)"
   }},
-  "reason": "[2-3 sentences explaining the overall score and category fit]",
-  "weakest_factor": "[dimension name with lowest score]",
+  "reason": "[2-3 sentences explaining the overall score]",
+  "weakest_factor": "[dimension key with lowest score relative to its max]",
   "improvise": "[specific actionable advice to improve this clip]"
 }}
 """
@@ -407,89 +407,6 @@ METADATA_RESPONSE_FORMAT = {
         "title": "string",
         "platforms": ["string"],
     }]
-}
-
-CATEGORY_DETECTION_PROMPT = """
-You are a video content analyst and scoring strategist.
-
-Read the transcript excerpt below and perform two tasks:
-
-## TASK 1 — IDENTIFY CATEGORY
-Identify what kind of video this is. Choose the most specific category that fits:
-educational, podcast, interview, tutorial, motivational, inspirational, sales/pitch,
-product demo, comedy/entertainment, storytelling, documentary, keynote, webinar,
-training, or any other category that better describes the content.
-
-## TASK 2 — ASSIGN DYNAMIC SCORING WEIGHTS
-Based on the identified category, assign weights to the 6 scoring dimensions.
-Rules:
-- All 6 weights must be whole numbers and sum to exactly 100
-- Assign HIGHER weight to dimensions that matter MOST for virality in this category
-- Assign LOWER weight to dimensions that matter LESS for this category
-- Every dimension must have a weight of at least 5
-
-## DIMENSION REFERENCE GUIDE (adapt — don't follow blindly):
-
-| Category               | Prioritize                              | De-emphasize              |
-|------------------------|-----------------------------------------|---------------------------|
-| Educational/Tutorial   | standalone_clarity, reframe_insight     | emotional_resonance       |
-| Motivational/Inspir.   | emotional_resonance, hook_strength      | standalone_clarity        |
-| Podcast/Interview      | hook_strength, quotability              | clean_ending              |
-| Sales/Product Demo     | hook_strength, standalone_clarity       | emotional_resonance       |
-| Comedy/Entertainment   | emotional_resonance, clean_ending       | reframe_insight           |
-| Storytelling           | emotional_resonance, reframe_insight    | standalone_clarity        |
-| Documentary/Keynote    | reframe_insight, standalone_clarity     | quotability               |
-| Training/Webinar       | standalone_clarity, reframe_insight     | emotional_resonance       |
-
-## TRANSCRIPT EXCERPT (first 3000 chars):
-{transcript_preview}
-
-## REQUIRED OUTPUT
-Return ONLY valid JSON with this exact structure:
-
-{{
-  "category": "string — specific category name",
-  "category_reason": "2-3 sentences explaining why this category was chosen based on the content, tone, and structure of the transcript",
-  "weights": {{
-    "hook_strength": number,
-    "reframe_insight": number,
-    "emotional_resonance": number,
-    "standalone_clarity": number,
-    "quotability": number,
-    "clean_ending": number
-  }},
-  "weight_reasoning": {{
-    "hook_strength": "1 sentence: why this weight for hook in this category",
-    "reframe_insight": "1 sentence: why this weight for reframe in this category",
-    "emotional_resonance": "1 sentence: why this weight for emotion in this category",
-    "standalone_clarity": "1 sentence: why this weight for clarity in this category",
-    "quotability": "1 sentence: why this weight for quotability in this category",
-    "clean_ending": "1 sentence: why this weight for ending in this category"
-  }},
-  "weights_summary": "2-3 sentences summarising the overall weighting strategy and how it serves this category's audience"
-}}
-"""
-
-CATEGORY_DETECTION_RESPONSE_FORMAT = {
-    "category": "string",
-    "category_reason": "string",
-    "weights": {
-        "hook_strength": "number",
-        "reframe_insight": "number",
-        "emotional_resonance": "number",
-        "standalone_clarity": "number",
-        "quotability": "number",
-        "clean_ending": "number",
-    },
-    "weight_reasoning": {
-        "hook_strength": "string",
-        "reframe_insight": "string",
-        "emotional_resonance": "string",
-        "standalone_clarity": "string",
-        "quotability": "string",
-        "clean_ending": "string",
-    },
-    "weights_summary": "string",
 }
 
 SPEAKER_DETECTION_PROMPT = """
@@ -598,6 +515,11 @@ _token_usage = {
 def _get_client():
     global _client
     if _client is None:
+        if not CLAUDE_API_KEY:
+            raise RuntimeError(
+                "CLAUDE_API_KEY environment variable is not set. "
+                "Export it before running, e.g. `export CLAUDE_API_KEY=sk-ant-...`."
+            )
         _client = Anthropic(api_key=CLAUDE_API_KEY)
     return _client
 
@@ -863,6 +785,7 @@ def preprocess(transcription_data):
     log.info(f"[PREPROCESS] Items: {len(items)}")
 
     sentences = []
+    all_words = []          # flat (start, end, text) for every spoken word → used by pacing
     current_words = []
     current_start = None
     current_end = None
@@ -873,6 +796,7 @@ def preprocess(transcription_data):
             word = item["alternatives"][0]["content"]
             start = float(item.get("start_time", 0))
             end = float(item.get("end_time", 0))
+            all_words.append((start, end, word))
             if current_start is None:
                 current_start = start
             current_end = end
@@ -906,8 +830,220 @@ def preprocess(transcription_data):
             video_duration = max(video_duration, float(et))
 
     language_code = transcription_data.get("language_code", "en-US")
-    log.info(f"[PREPROCESS] {len(sentences)} sentences, {video_duration:.1f}s, lang={language_code}")
-    return sentences, video_duration, language_code
+    log.info(
+        f"[PREPROCESS] {len(sentences)} sentences, {len(all_words)} words, "
+        f"{video_duration:.1f}s, lang={language_code}"
+    )
+    return sentences, video_duration, language_code, all_words
+
+
+# ── Pacing analysis (deterministic, from word-level timestamps) ──────────────
+#
+# Computes a 0–20 "pacing score" for a clip purely from its word timings — no LLM.
+# Four signals (WPM, filler ratio, dead-air gaps, burst ratio) each adjust a base
+# score of 20. This is metadata that runs alongside the LLM 6-dimension score; it
+# does NOT gate clip selection.
+
+# Single-token fillers. The bigram "you know" is handled separately below.
+PACING_FILLER_WORDS = {
+    "um", "uh", "like", "basically", "literally", "actually", "right", "so",
+}
+_PACING_PUNCT = ".,!?;:\"'()-—…"
+
+# Thresholds (per manager's pacing framework).
+PACING_WPM_IDEAL      = (130, 180)   # 0 adjustment
+PACING_WPM_SLOW       = (110, 130)   # -3
+PACING_WPM_FAST       = (180, 220)   # -1
+                                     # outside [110, 220] → -5
+PACING_DEAD_AIR_GAP   = 1.5          # seconds; gap larger than this = dead air
+PACING_BURST_GAP      = 0.3          # seconds; gap smaller than this = burst pair
+PACING_FILLER_OK      = 0.03
+PACING_FILLER_MAX     = 0.07
+PACING_BURST_HIGH     = 0.70
+PACING_BURST_MID      = 0.50
+
+
+def _pacing_norm(token):
+    """Lowercase + strip surrounding punctuation for filler matching."""
+    return token.strip().strip(_PACING_PUNCT).lower()
+
+
+def _count_fillers(words):
+    """Count filler words, treating 'you know' as a single filler."""
+    norms = [_pacing_norm(w[2]) for w in words]
+    count = 0
+    i = 0
+    n = len(norms)
+    while i < n:
+        if i + 1 < n and norms[i] == "you" and norms[i + 1] == "know":
+            count += 1
+            i += 2
+            continue
+        if norms[i] in PACING_FILLER_WORDS:
+            count += 1
+        i += 1
+    return count
+
+
+def compute_pacing(segments):
+    """
+    Compute pacing metrics + score for a clip.
+
+    segments: list of segments, each a list of (start, end, text) word tuples.
+              Sequential clips have one segment; non-sequential shorts have one
+              per contiguous piece. Dead-air and burst gaps are measured WITHIN a
+              segment only — the cut between two segments is intentional, not a pause.
+
+    Returns a dict with the four metrics and a 0–20 pacing_score.
+    """
+    flat = [w for seg in segments for w in seg]
+    total_words = len(flat)
+    if total_words == 0:
+        return {
+            "pacing_score": 0,
+            "wpm": 0.0,
+            "filler_ratio": 0.0,
+            "dead_air_gaps": 0,
+            "burst_ratio": 0.0,
+            "total_words": 0,
+            "speaking_duration": 0.0,
+            "adjustments": {"wpm": 0, "filler": 0, "dead_air": 0, "burst": 0},
+        }
+
+    # Speaking duration = sum of each segment's own span (ignores inter-segment cuts).
+    speaking_duration = sum((seg[-1][1] - seg[0][0]) for seg in segments if seg)
+    minutes = speaking_duration / 60.0
+    wpm = total_words / minutes if minutes > 0 else 0.0
+
+    filler_count = _count_fillers(flat)
+    filler_ratio = filler_count / total_words
+
+    dead_air_gaps = 0
+    burst_words = 0
+    for seg in segments:
+        for a, b in zip(seg, seg[1:]):
+            gap = b[0] - a[1]
+            if gap > PACING_DEAD_AIR_GAP:
+                dead_air_gaps += 1
+            if gap < PACING_BURST_GAP:
+                burst_words += 1
+    burst_ratio = burst_words / total_words
+
+    # ── Score: base 20, apply each adjustment, clamp to [0, 20] ───────────────
+    adj = {"wpm": 0, "filler": 0, "dead_air": 0, "burst": 0}
+
+    if PACING_WPM_IDEAL[0] <= wpm <= PACING_WPM_IDEAL[1]:
+        adj["wpm"] = 0
+    elif PACING_WPM_SLOW[0] <= wpm < PACING_WPM_SLOW[1]:
+        adj["wpm"] = -3
+    elif PACING_WPM_FAST[0] < wpm <= PACING_WPM_FAST[1]:
+        adj["wpm"] = -1
+    else:
+        adj["wpm"] = -5
+
+    if filler_ratio < PACING_FILLER_OK:
+        adj["filler"] = 0
+    elif filler_ratio <= PACING_FILLER_MAX:
+        adj["filler"] = -2
+    else:
+        adj["filler"] = -5
+
+    if dead_air_gaps == 0:
+        adj["dead_air"] = 0
+    elif dead_air_gaps <= 2:
+        adj["dead_air"] = -2
+    else:
+        adj["dead_air"] = -5
+
+    if burst_ratio > PACING_BURST_HIGH:
+        adj["burst"] = 2
+    elif burst_ratio >= PACING_BURST_MID:
+        adj["burst"] = 0
+    else:
+        adj["burst"] = -2
+
+    score = 20 + adj["wpm"] + adj["filler"] + adj["dead_air"] + adj["burst"]
+    score = max(0, min(20, score))
+
+    return {
+        "pacing_score": score,
+        "wpm": round(wpm, 1),
+        "filler_ratio": round(filler_ratio, 4),
+        "dead_air_gaps": dead_air_gaps,
+        "burst_ratio": round(burst_ratio, 4),
+        "total_words": total_words,
+        "speaking_duration": round(speaking_duration, 2),
+        "adjustments": adj,
+    }
+
+
+def _words_in_range(all_words, start, end, eps=0.05):
+    """Return word tuples whose timing falls inside [start, end] (inclusive, with slack)."""
+    return [w for w in all_words if w[0] >= start - eps and w[1] <= end + eps]
+
+
+def pacing_for_clip(clip, all_words):
+    """
+    Build the per-segment word lists for a clip and compute its pacing.
+
+    Works for both sequential clips (single start_time/end_time) and
+    non-sequential shorts (a `clips` list of contiguous segments).
+    """
+    raw_segments = clip.get("clips")
+    if raw_segments:
+        segments = [
+            _words_in_range(all_words, seg["start_time"], seg["end_time"])
+            for seg in raw_segments
+        ]
+    else:
+        segments = [_words_in_range(all_words, clip["start_time"], clip["end_time"])]
+    return compute_pacing(segments)
+
+
+def _format_pacing_inline(p):
+    """Compact pacing stats for window/sentence list lines."""
+    if not p or p.get("total_words", 0) == 0:
+        return ""
+    return (
+        f"| pacing {p['pacing_score']}/20 "
+        f"wpm {p['wpm']} fill {p['filler_ratio']:.0%} "
+        f"dead {p['dead_air_gaps']} burst {p['burst_ratio']:.0%}"
+    )
+
+
+def _sentence_pacing_hint(s, all_words):
+    """Per-sentence delivery flags for non-seq selection (flags problems only)."""
+    if not all_words:
+        return ""
+    words = _words_in_range(all_words, s.start, s.end)
+    if not words:
+        return ""
+    p = compute_pacing([words])
+    if p.get("total_words", 0) == 0:
+        return ""
+    flags = []
+    if p["filler_ratio"] >= PACING_FILLER_OK:
+        flags.append(f"fill {p['filler_ratio']:.0%}")
+    if p["dead_air_gaps"] > 0:
+        flags.append(f"dead_air {p['dead_air_gaps']}")
+    if p["wpm"] > 0 and (p["wpm"] < 110 or p["wpm"] > 220):
+        flags.append(f"wpm {p['wpm']}")
+    if not flags:
+        return ""
+    return f" | {' '.join(flags)}"
+
+
+def _format_sentences(sentences, all_words=None):
+    """
+    Format the full sentence list for Agent #2 / Agent #4 cached context.
+    When all_words is supplied, problematic delivery (fillers, dead air, bad WPM)
+    is flagged inline so the LLM can avoid weak sentences at pick time.
+    """
+    lines = []
+    for s in sentences:
+        hint = _sentence_pacing_hint(s, all_words)
+        lines.append(f"S{s.index}: [{s.start:.1f}s - {s.end:.1f}s] {s.text}{hint}")
+    return "\n".join(lines)
 
 
 # ── Stage 2: Segment (speaker-boundary-aware candidate windows) ──────────────
@@ -1098,146 +1234,66 @@ def _build_sentence_to_speaker_map(speakers, sentences):
     return mapping
 
 
-# ── Stage 0: Category detection + dynamic weights (Agent #0) ─────────────────
-
-def detect_category_and_weights(sentences):
-    """
-    Stage 0: Send a transcript preview to the LLM to:
-      1. Identify the video category
-      2. Return dynamic scoring weights (whole numbers summing to 100)
-      3. Return per-dimension reasoning explaining WHY each weight was chosen
-
-    Returns a dict with:
-      category         — detected category string
-      category_reason  — why that category was chosen
-      weights          — fractions (sum to 1.0), ready for scoring math
-      weights_raw      — whole numbers (sum to 100), for display / output
-      weight_reasoning — per-dimension reasoning strings
-      weights_summary  — overall weighting strategy summary
-    Falls back to DIMENSION_WEIGHTS on any error.
-    """
-    transcript_preview = " ".join(s.text for s in sentences)[:3000]
-
-    prompt = CATEGORY_DETECTION_PROMPT.format(transcript_preview=transcript_preview)
-
-    try:
-        result = get_response(
-            prompt,
-            response_format=CATEGORY_DETECTION_RESPONSE_FORMAT,
-            caller="category_detector",
-            max_tokens=1000,
-        )
-    except Exception as e:
-        log.error(f"[CATEGORY] Detection failed: {repr(e)} — falling back to static weights")
-        return _fallback_category_info()
-
-    weights_raw = result.get("weights", {})
-
-    # Validate all 6 expected keys are present
-    expected_keys = set(DIMENSION_WEIGHTS.keys())
-    if not expected_keys.issubset(set(weights_raw.keys())):
-        log.warning("[CATEGORY] LLM returned incomplete weights — falling back to static weights")
-        return _fallback_category_info()
-
-    # Validate all values are numeric
-    try:
-        weights_raw = {k: int(v) for k, v in weights_raw.items()}
-    except (ValueError, TypeError):
-        log.warning("[CATEGORY] Non-numeric weights returned — falling back to static weights")
-        return _fallback_category_info()
-
-    # Normalize if weights don't sum to exactly 100
-    total = sum(weights_raw.values())
-    if total != 100:
-        log.warning(f"[CATEGORY] Weights sum to {total}, normalizing to 100")
-        weights_raw = {k: round(v * 100 / total) for k, v in weights_raw.items()}
-        # Fix any rounding drift on the largest-weight dimension
-        diff = 100 - sum(weights_raw.values())
-        largest = max(weights_raw, key=weights_raw.get)
-        weights_raw[largest] += diff
-
-    # Enforce minimum weight of 5 per dimension
-    for k in weights_raw:
-        if weights_raw[k] < 5:
-            log.warning(f"[CATEGORY] {k} weight={weights_raw[k]} below minimum 5 — clamping")
-            weights_raw[k] = 5
-
-    # Convert to fractions for scoring math
-    weights_normalized = {k: v / 100 for k, v in weights_raw.items()}
-
-    weight_reasoning = result.get("weight_reasoning", {})
-    category = result.get("category", "general")
-    category_reason = result.get("category_reason", "")
-    weights_summary = result.get("weights_summary", "")
-
-    log.info(
-        f"[CATEGORY] Detected: '{category}' | "
-        f"Weights: { {k: v for k, v in weights_raw.items()} }"
-    )
-    for dim, reason in weight_reasoning.items():
-        log.info(f"[CATEGORY]   {dim} ({weights_raw.get(dim, '?')}%): {reason}")
-
-    return {
-        "category": category,
-        "category_reason": category_reason,
-        "weights": weights_normalized,
-        "weights_raw": weights_raw,
-        "weight_reasoning": weight_reasoning,
-        "weights_summary": weights_summary,
-    }
-
-
-def _fallback_category_info():
-    """Return static DIMENSION_WEIGHTS wrapped in the same shape as detect_category_and_weights."""
-    weights_raw = {k: int(v * 100) for k, v in DIMENSION_WEIGHTS.items()}
-    return {
-        "category": "general",
-        "category_reason": "Category detection was skipped or failed; using static default weights.",
-        "weights": DIMENSION_WEIGHTS.copy(),
-        "weights_raw": weights_raw,
-        "weight_reasoning": {k: "Default static weight." for k in DIMENSION_WEIGHTS},
-        "weights_summary": "Static fallback weights applied — no dynamic category detection.",
-    }
-
-
 # ── Scorer ────────────────────────────────────────────────────────────────────
 
-def score_single_short(short, category_info):
+def _build_pacing_section(short, all_words):
     """
-    Score a clip using dynamic weights and category context from Stage 0.
+    Build the optional PACING / ENERGY block for the scorer prompt from the
+    clip's measured word-level delivery stats. Returns "" when word data is
+    unavailable so the prompt stays unchanged in that case.
+    """
+    if not all_words:
+        return ""
+    p = pacing_for_clip(short, all_words)
+    if not p or p.get("total_words", 0) == 0:
+        return ""
+    suggested = round(p["pacing_score"] * 7 / 20)
+    return f"""
+## PACING / ENERGY — auto-scored out of 7 (from measurements)
+This dimension is computed from word-level timestamps — you do not score it in JSON.
+- Speaking rate: {p['wpm']} WPM (ideal ≈ 130–180)
+- Filler ratio: {p['filler_ratio']:.1%} (good <3%, weak >7%)
+- Dead-air pauses (>1.5s): {p['dead_air_gaps']}
+- Burst delivery: {p['burst_ratio']:.0%} of words
+- Computed pacing points: **{suggested}/7** (from internal formula {p['pacing_score']}/20)
+Comment on delivery in score_reasoning.pacing_energy only.
+"""
 
-    category_info must contain:
-      category         — e.g. "educational_keynote"
-      category_reason  — why the category was chosen
-      weights          — fractions summing to 1.0
-      weights_raw      — whole numbers summing to 100
-      weight_reasoning — per-dimension reasoning strings
+
+def _cap_dimension_score(raw_val, max_val):
+    """Clamp LLM score to 0..max_val for that dimension."""
+    return min(max(0, int(raw_val)) + SCORE_MARKET_ADJUSTMENT, max_val)
+
+
+def _pacing_formula_to_points(pacing_result, max_val=7):
+    """Map internal formula pacing_score (0–20) → points out of max_val (usually 7)."""
+    ps = max(0, min(20, int(pacing_result.get("pacing_score", 0))))
+    return min(round(ps * max_val / 20) + SCORE_MARKET_ADJUSTMENT, max_val)
+
+
+def score_single_short(short, scoring_config, all_words=None):
+    """
+    Score a clip using the standard 7-dimension weights.
+
+    scoring_config: dict from get_scoring_config() with weights + weights_raw.
+    all_words: optional word list for measured pacing stats in the scorer prompt.
     """
     text_preview = " ".join(short["text"].split()[:100]) + "..."
-    dimension_weights = category_info["weights"]
-    weights_raw = category_info["weights_raw"]
-    weight_reasoning = category_info.get("weight_reasoning", {})
+    dimension_weights = scoring_config["weights"]
+    weights_raw = scoring_config["weights_raw"]
 
     prompt = SCORER_PROMPT.format(
         clip_type=short["type"],
         duration=short["duration"],
         text_preview=text_preview,
-        video_category=category_info["category"],
-        category_reason=category_info.get("category_reason", ""),
-        # per-dimension weights (whole numbers for readability in prompt)
-        w_hook=weights_raw.get("hook_strength", 25),
-        w_reframe=weights_raw.get("reframe_insight", 20),
-        w_emotion=weights_raw.get("emotional_resonance", 18),
-        w_clarity=weights_raw.get("standalone_clarity", 17),
-        w_quotable=weights_raw.get("quotability", 12),
-        w_ending=weights_raw.get("clean_ending", 8),
-        # per-dimension reasoning (so scorer understands WHY each weight was chosen)
-        wr_hook=weight_reasoning.get("hook_strength", ""),
-        wr_reframe=weight_reasoning.get("reframe_insight", ""),
-        wr_emotion=weight_reasoning.get("emotional_resonance", ""),
-        wr_clarity=weight_reasoning.get("standalone_clarity", ""),
-        wr_quotable=weight_reasoning.get("quotability", ""),
-        wr_ending=weight_reasoning.get("clean_ending", ""),
+        pacing_section=_build_pacing_section(short, all_words),
+        w_hook=weights_raw["hook_strength"],
+        w_reframe=weights_raw["reframe_insight"],
+        w_emotion=weights_raw["emotional_resonance"],
+        w_clarity=weights_raw["standalone_clarity"],
+        w_quotable=weights_raw["quotability"],
+        w_ending=weights_raw["clean_ending"],
+        w_pacing=weights_raw["pacing_energy"],
     )
 
     result = get_response(prompt, response_format=SCORER_RESPONSE_FORMAT, caller="scorer")
@@ -1250,29 +1306,39 @@ def score_single_short(short, category_info):
         except (ValueError, TypeError):
             return 0
 
-    raw_scores = {k: safe_int(result.get(k, 0)) for k in dimension_weights.keys()}
-
-    # Get max values for each dimension from weights_raw (e.g., 22, 28, 12, 20, 13, 5)
     max_per_dimension = weights_raw
-
-    # Cap each score at its dimension's max weight, then apply adjustment
     adjusted_scores = {}
-    for dim, raw_val in raw_scores.items():
-        max_val = max_per_dimension.get(dim, 20)
-        adjusted_scores[dim] = min(raw_val + SCORE_MARKET_ADJUSTMENT, max_val)
 
-    # Sum all adjusted scores (they're already weighted by their max values which sum to 100)
-    # E.g., hook(14/22) + reframe(18/28) + emotion(12/15) + clarity(13/20) + quotability(10/10) + ending(5/5) = 72/100
+    # LLM scores 6 content dimensions directly out of each max (23, 18, 17, …)
+    llm_dims = [d for d in dimension_weights if d != "pacing_energy"]
+    for dim in llm_dims:
+        max_val = max_per_dimension[dim]
+        adjusted_scores[dim] = _cap_dimension_score(result.get(dim, 0), max_val)
+
+    # Pacing / Energy: computed out of 7 from measured delivery (not LLM)
+    pacing_max = max_per_dimension["pacing_energy"]
+    if all_words:
+        pacing_measured = pacing_for_clip(short, all_words)
+        adjusted_scores["pacing_energy"] = _pacing_formula_to_points(pacing_measured, pacing_max)
+    else:
+        adjusted_scores["pacing_energy"] = _cap_dimension_score(result.get("pacing_energy", 0), pacing_max)
+
     total_score = sum(adjusted_scores.values())
-    log.info(f"Total score: {total_score}/100 (sum of adjusted dimensions)")
-    weakest_factor = min(raw_scores, key=lambda k: raw_scores[k])
+    log.info(
+        f"Total score: {total_score}/100 | breakdown: {adjusted_scores}"
+    )
+
+    def _dim_ratio(dim):
+        m = max_per_dimension.get(dim, 1)
+        return adjusted_scores[dim] / m if m else 0
+
+    weakest_factor = min(adjusted_scores.keys(), key=_dim_ratio)
 
     return {
         "ConfidenceScore": total_score,
         "total_score": total_score,
         "ScoreBreakdown": adjusted_scores,
         "ScoreReasoning": result.get("score_reasoning", {}),   # per-dim reasoning from LLM
-        "Category": result.get("category", category_info["category"]),
         "reason": result.get("reason", ""),
         "weakest_factor": result.get("weakest_factor", weakest_factor),
         "improvise": result.get("improvise", ""),
@@ -1281,14 +1347,14 @@ def score_single_short(short, category_info):
 
 # ── Stage 3a: Sequential selection (Agent #1 + #3) ────────────────────────────
 
-def _build_scoring_context(category_info):
+def _build_scoring_context(scoring_config=None):
     """
-    Build a human-readable scoring framework block from Stage 0 category_info.
-    Injected into SEQUENCE_PROMPT and NONSEQUENCE_PROMPT so Agent #1 and #2
-    pick clips using the same dynamic weights the scorer will apply.
+    Build the standard 7-dimension scoring framework for selection/refine prompts.
+    scoring_config is optional; defaults to get_scoring_config().
     """
-    weights_raw = category_info["weights_raw"]
-    weight_reasoning = category_info.get("weight_reasoning", {})
+    if scoring_config is None:
+        scoring_config = get_scoring_config()
+    weights_raw = scoring_config["weights_raw"]
 
     dim_labels = {
         "hook_strength":       "Hook Strength",
@@ -1297,6 +1363,7 @@ def _build_scoring_context(category_info):
         "standalone_clarity":  "Standalone Clarity",
         "quotability":         "Quotability",
         "clean_ending":        "Clean Ending",
+        "pacing_energy":       "Pacing / Energy",
     }
 
     # Detailed guidance per dimension — kept from the original prompts but
@@ -1321,7 +1388,7 @@ def _build_scoring_context(category_info):
             "This must come from the core of what the video is delivering — not from a transitional, repetitive, or setup segment that only exists to lead into something else. If the moment is purely preamble, it scores low here regardless of how well it opens."
         ),
         "emotional_resonance": (
-            "Ask whether this moment makes the viewer feel something — curiosity, inspiration, humour, surprise, or genuine emotion that relates to the viewers of the identified category of the video."
+            "Ask whether this moment makes the viewer feel something — curiosity, inspiration, humour, surprise, or genuine emotion."
             "The feeling must be self-contained. A viewer who has never seen the full video should feel it just as strongly as someone who has watched everything. If the emotion only lands because of what came before in the full video, this moment is not ready to stand alone."
         ),
         "standalone_clarity": (
@@ -1336,23 +1403,26 @@ def _build_scoring_context(category_info):
            "Finally, ask whether the clip ends at an emotional or narrative peak — a punchline, a powerful takeaway, a resolved story, or a line that lands with weight." 
            "Never end while a thought is still unfinished. Never end on a filler sound like 'uh,' 'um,' or 'hmm.' The last word the viewer hears should feel like the right last word."
         ),
+        "pacing_energy": (
+            "Evaluate delivery quality using measured pacing hints on windows/sentences when shown: "
+            "ideal WPM 130–180, filler ratio <3%, minimal dead-air gaps (>1.5s), energetic burst delivery. "
+            "Penalize draggy, filler-heavy, or pause-filled stretches. When content is equal, prefer better pacing."
+        ),
     }
 
     lines = []
     for key, label in dim_labels.items():
         pts = weights_raw.get(key, 0)
-        why = weight_reasoning.get(key, "")
         guidance = dim_guidance.get(key, "")
         lines.append(
-            f"**{label} ({pts} points)**\n"
-            f"Why {pts} pts for this category: {why}\n"
+            f"**{label} (score 0–{pts} points)**\n"
             f"How to evaluate: {guidance}\n"
         )
 
     return "\n".join(lines)
 
 
-def _format_windows(windows, max_windows=500):
+def _format_windows(windows, max_windows=500, all_words=None):
     if len(windows) > max_windows:
         step = max(1, len(windows) // max_windows)
         thinned = windows[::step][:max_windows]
@@ -1367,9 +1437,13 @@ def _format_windows(windows, max_windows=500):
             preview = " ".join(words[:15]) + " ... " + " ".join(words[-10:])
         # Include section tag so the agent knows exactly what it is selecting
         section_tag = f"[{w.section_type}]" + (f" {w.section_label}" if w.section_label else "")
+        pacing_hint = ""
+        if all_words:
+            p = pacing_for_clip({"start_time": w.start_time, "end_time": w.end_time}, all_words)
+            pacing_hint = " " + _format_pacing_inline(p)
         lines.append(
             f"W{w.id} ({w.duration}s) [{w.start_time:.1f}s - {w.end_time:.1f}s] "
-            f"{section_tag} {preview}"
+            f"{section_tag} {preview}{pacing_hint}"
         )
     return "\n".join(lines)
 
@@ -1386,11 +1460,11 @@ def _calculate_clips_count(video_duration, available_windows):
     return min(clips, available_windows, max_possible)
 
 
-def _agent_sequence(windows, clips_count, category_info, regenerate_feedback=None,
-                    used_window_ids=None, frames_b64=None):
+def _agent_sequence(windows, clips_count, scoring_config, regenerate_feedback=None,
+                    used_window_ids=None, frames_b64=None, all_words=None):
     if used_window_ids is None:
         used_window_ids = set()
-    windows_text = _format_windows(windows)
+    windows_text = _format_windows(windows, all_words=all_words)
 
     # ── Prompt caching ────────────────────────────────────────────────────────
     # windows_text is large and identical on every iteration (only the feedback
@@ -1447,19 +1521,18 @@ You have access to video frames extracted every 30 seconds. Use these to:
 """
 
     # Dynamic part of the prompt — does NOT include windows_text (it's cached above)
-    weights_raw = category_info["weights_raw"]
+    weights_raw = scoring_config["weights_raw"]
     prompt = SEQUENCE_PROMPT.format(
         feedback_section=feedback_section + visual_section,
         windows_text="[See the AVAILABLE WINDOWS context provided above]",
-        video_category=category_info["category"],
-        category_reason=category_info.get("category_reason", ""),
-        scoring_context=_build_scoring_context(category_info),
-        w_hook=weights_raw.get("hook_strength", 25),
-        w_reframe=weights_raw.get("reframe_insight", 20),
-        w_emotion=weights_raw.get("emotional_resonance", 18),
-        w_clarity=weights_raw.get("standalone_clarity", 17),
-        w_quotable=weights_raw.get("quotability", 12),
-        w_ending=weights_raw.get("clean_ending", 8),
+        scoring_context=_build_scoring_context(scoring_config),
+        w_hook=weights_raw["hook_strength"],
+        w_reframe=weights_raw["reframe_insight"],
+        w_emotion=weights_raw["emotional_resonance"],
+        w_clarity=weights_raw["standalone_clarity"],
+        w_quotable=weights_raw["quotability"],
+        w_ending=weights_raw["clean_ending"],
+        w_pacing=weights_raw["pacing_energy"],
         social_media_max=SOCIAL_MEDIA_MAX_DURATION,
     )
 
@@ -1517,7 +1590,7 @@ def _window_to_clip(w, reason=""):
     }
 
 
-def _refine_clip(current, windows, category_info, feedback, frames_b64=None):
+def _refine_clip(current, windows, scoring_config, feedback, frames_b64=None, all_words=None):
     """
     Agent #3 — in-place boundary refinement.
 
@@ -1545,9 +1618,9 @@ def _refine_clip(current, windows, category_info, feedback, frames_b64=None):
         return None
 
     # Full-resolution option list (small region → no aggressive thinning).
-    options = _format_windows(neighbours, max_windows=REFINE_MAX_OPTIONS)
+    options = _format_windows(neighbours, max_windows=REFINE_MAX_OPTIONS, all_words=all_words)
 
-    weights_raw = category_info["weights_raw"]
+    weights_raw = scoring_config["weights_raw"]
     prompt = REFINE_PROMPT.format(
         score=feedback["score"],
         target=TARGET_SCORE,
@@ -1555,11 +1628,11 @@ def _refine_clip(current, windows, category_info, feedback, frames_b64=None):
         cur_end=cur_end,
         cur_duration=current.get("duration", cur_end - cur_start),
         cur_text=current.get("text", ""),
+        pacing_section=_build_pacing_section(current, all_words),
         weakest_factor=feedback["weakest_factor"],
         reason=feedback["reason"],
         improvise=feedback["improvise"],
-        video_category=category_info["category"],
-        scoring_context=_build_scoring_context(category_info),
+        scoring_context=_build_scoring_context(scoring_config),
         social_media_max=SOCIAL_MEDIA_MAX_DURATION,
         options=options,
     )
@@ -1586,7 +1659,7 @@ def _refine_clip(current, windows, category_info, feedback, frames_b64=None):
     return None
 
 
-def _agent_sequence_reviewer(seq_shorts, windows, category_info, frames_b64=None):
+def _agent_sequence_reviewer(seq_shorts, windows, scoring_config, frames_b64=None, all_words=None):
     """
     Agent #3 — score every clip and, when it falls below TARGET_SCORE, REFINE
     the same clip in place (adjust its start/end boundaries) rather than picking
@@ -1605,7 +1678,7 @@ def _agent_sequence_reviewer(seq_shorts, windows, category_info, frames_b64=None
         # Budget: 1 initial score + MAX_ITERATIONS_PER_SHORT_SEQUENCE refinement rounds.
         for iteration in range(MAX_ITERATIONS_PER_SHORT_SEQUENCE + 1):
             try:
-                score_result = score_single_short(current, category_info)
+                score_result = score_single_short(current, scoring_config, all_words=all_words)
             except (RuntimeError, ValueError) as e:
                 log.error(f"[{short_id}] Scoring failed: {e}. Keeping current version.")
                 break
@@ -1633,7 +1706,7 @@ def _agent_sequence_reviewer(seq_shorts, windows, category_info, frames_b64=None
             }
             log.info(f"{short_id} refine {iteration + 1} before: {current.get('text', '')[:120]}...")
             iteration_log["iterations"] += 1
-            refined = _refine_clip(current, windows, category_info, feedback, frames_b64=frames_b64)
+            refined = _refine_clip(current, windows, scoring_config, feedback, frames_b64=frames_b64, all_words=all_words)
             if not refined:
                 break  # no neighbour options — keep best so far
             # No progress (LLM returned the same boundaries) → stop refining.
@@ -1657,13 +1730,13 @@ def _agent_sequence_reviewer(seq_shorts, windows, category_info, frames_b64=None
     return reviewed, iteration_log
 
 
-def sequential_selection(sentences, windows, video_duration, category_info, frames_b64=None):
+def sequential_selection(sentences, windows, video_duration, scoring_config, frames_b64=None, all_words=None):
     try:
         clips_count = _calculate_clips_count(video_duration, len(windows))
         log.info(f"[SEQ] Targeting {clips_count} clips from {len(windows)} windows")
-        seq_clips = _agent_sequence(windows, clips_count, category_info=category_info, frames_b64=frames_b64)
+        seq_clips = _agent_sequence(windows, clips_count, scoring_config=scoring_config, frames_b64=frames_b64, all_words=all_words)
         log.info(f"[SEQ] Agent #1 generated {len(seq_clips)} clips")
-        reviewed, log_data = _agent_sequence_reviewer(seq_clips, windows, category_info, frames_b64=frames_b64)
+        reviewed, log_data = _agent_sequence_reviewer(seq_clips, windows, scoring_config, frames_b64=frames_b64, all_words=all_words)
         log.info(f"[SEQ] Agent #3 reviewed {len(reviewed)}, regenerated {log_data['regenerated']}")
         return reviewed, log_data
     except Exception as e:
@@ -1683,10 +1756,8 @@ def _calculate_target_count(video_duration):
     return min(target, max_possible)
 
 
-def _agent_nonsequence(sentences, clips_count, category_info, regenerate_feedback=None):
-    sentences_text = "\n".join(
-        f"S{s.index}: [{s.start:.1f}s - {s.end:.1f}s] {s.text}" for s in sentences
-    )
+def _agent_nonsequence(sentences, clips_count, scoring_config, regenerate_feedback=None, all_words=None):
+    sentences_text = _format_sentences(sentences, all_words)
 
     # ── Prompt caching ────────────────────────────────────────────────────────
     # The full sentences list is identical on every iteration; only the feedback
@@ -1727,19 +1798,18 @@ YOUR TASK: Pick a DIFFERENT set of sentences that addresses these issues.
         clips_count = 1
 
     # Dynamic prompt — sentences body replaced by reference to the cached block
-    weights_raw = category_info["weights_raw"]
+    weights_raw = scoring_config["weights_raw"]
     prompt = NONSEQUENCE_PROMPT.format(
         feedback_section=feedback_section,
         sentences_text="[See the AVAILABLE SENTENCES context provided above]",
-        video_category=category_info["category"],
-        category_reason=category_info.get("category_reason", ""),
-        scoring_context=_build_scoring_context(category_info),
-        w_hook=weights_raw.get("hook_strength", 25),
-        w_reframe=weights_raw.get("reframe_insight", 20),
-        w_emotion=weights_raw.get("emotional_resonance", 18),
-        w_clarity=weights_raw.get("standalone_clarity", 17),
-        w_quotable=weights_raw.get("quotability", 12),
-        w_ending=weights_raw.get("clean_ending", 8),
+        scoring_context=_build_scoring_context(scoring_config),
+        w_hook=weights_raw["hook_strength"],
+        w_reframe=weights_raw["reframe_insight"],
+        w_emotion=weights_raw["emotional_resonance"],
+        w_clarity=weights_raw["standalone_clarity"],
+        w_quotable=weights_raw["quotability"],
+        w_ending=weights_raw["clean_ending"],
+        w_pacing=weights_raw["pacing_energy"],
     )
 
     result = get_response(
@@ -1803,7 +1873,7 @@ def _assemble_nonseq_short(sentence_ids, sentence_by_idx, topic="", reason=""):
     }
 
 
-def _refine_nonseq_short(current, sentences, category_info, feedback):
+def _refine_nonseq_short(current, sentences, scoring_config, feedback, all_words=None):
     """
     Agent #4 — in-place refinement for non-sequential shorts.
 
@@ -1815,9 +1885,7 @@ def _refine_nonseq_short(current, sentences, category_info, feedback):
 
     Returns a refined short dict, or None.
     """
-    sentences_text = "\n".join(
-        f"S{s.index}: [{s.start:.1f}s - {s.end:.1f}s] {s.text}" for s in sentences
-    )
+    sentences_text = _format_sentences(sentences, all_words)
     # Byte-identical to Agent #2's cached_context → same Anthropic prompt-cache entry.
     cached_context = (
         "## AVAILABLE SENTENCES (full transcript)\n\n"
@@ -1854,11 +1922,11 @@ def _refine_nonseq_short(current, sentences, category_info, feedback):
         cur_num=current.get("num_clips", len(cur_ids)),
         cur_ids=", ".join(f"S{i}" for i in cur_ids) if cur_ids else "unknown",
         cur_text=current.get("text", ""),
+        pacing_section=_build_pacing_section(current, all_words),
         weakest_factor=feedback["weakest_factor"],
         reason=feedback["reason"],
         improvise=feedback["improvise"],
-        video_category=category_info["category"],
-        scoring_context=_build_scoring_context(category_info),
+        scoring_context=_build_scoring_context(scoring_config),
     )
 
     result = get_response(
@@ -1898,7 +1966,7 @@ def _refine_nonseq_short(current, sentences, category_info, feedback):
     return None
 
 
-def _agent_nonsequence_reviewer(nonseq_shorts, sentences, category_info):
+def _agent_nonsequence_reviewer(nonseq_shorts, sentences, scoring_config, all_words=None):
     """
     Agent #4 — score every non-sequential short and, when it falls below
     TARGET_SCORE, REFINE the same short in place (adjust which sentences are
@@ -1916,7 +1984,7 @@ def _agent_nonsequence_reviewer(nonseq_shorts, sentences, category_info):
 
         for iteration in range(MAX_ITERATIONS_PER_SHORT_NONSEQUENCE + 1):
             try:
-                score_result = score_single_short(current, category_info)
+                score_result = score_single_short(current, scoring_config, all_words=all_words)
             except (RuntimeError, ValueError) as e:
                 log.error(f"[{short_id}] Scoring failed: {e}. Keeping current version.")
                 break
@@ -1944,7 +2012,7 @@ def _agent_nonsequence_reviewer(nonseq_shorts, sentences, category_info):
             }
             log.info(f"{short_id} refine {iteration + 1} before: {current.get('text', '')[:120]}...")
             iteration_log["iterations"] += 1
-            refined = _refine_nonseq_short(current, sentences, category_info, feedback)
+            refined = _refine_nonseq_short(current, sentences, scoring_config, feedback, all_words=all_words)
             if not refined:
                 break  # no refinement produced — keep best so far
             # No change in selection → stop refining (avoids a wasted re-score).
@@ -1967,16 +2035,16 @@ def _agent_nonsequence_reviewer(nonseq_shorts, sentences, category_info):
     return reviewed, iteration_log
 
 
-def non_sequential_selection(sentences, video_duration, category_info):
+def non_sequential_selection(sentences, video_duration, scoring_config, all_words=None):
     try:
         if video_duration < NON_SEQUENTIAL_MIN_DURATION:
             log.info(f"[NONSEQ] Video too short ({video_duration}s) — skipping")
             return [], {}
         clips_count = _calculate_target_count(video_duration)
         log.info(f"[NONSEQ] Targeting {clips_count} shorts")
-        nonseq_shorts = _agent_nonsequence(sentences, clips_count, category_info=category_info)
+        nonseq_shorts = _agent_nonsequence(sentences, clips_count, scoring_config=scoring_config, all_words=all_words)
         log.info(f"[NONSEQ] Agent #2 generated {len(nonseq_shorts)} shorts")
-        reviewed, log_data = _agent_nonsequence_reviewer(nonseq_shorts, sentences, category_info)
+        reviewed, log_data = _agent_nonsequence_reviewer(nonseq_shorts, sentences, scoring_config, all_words=all_words)
         log.info(f"[NONSEQ] Agent #4 reviewed {len(reviewed)}, regenerated {log_data['regenerated']}")
         return reviewed, log_data
     except Exception as e:
@@ -1996,7 +2064,6 @@ def final_metadata(sequential, non_sequential, language_code):
         parts.append(
             f"Short (ID: {s.get('short_id', '')})\n"
             f"Type: {s['type']} | Duration: {s['duration']:.1f}s | Score: {s.get('ConfidenceScore', 0)}/100\n"
-            f"Category: {s.get('Category', '')}\n"
             f"Text: \"{' '.join(s['text'].split()[:80])}...\""
         )
     context_text = "\n\n".join(parts)
@@ -2039,15 +2106,23 @@ def ranking(sequential, non_sequential):
 
 # ── Output formatting ─────────────────────────────────────────────────────────
 
-def format_sequential(clips):
+def format_sequential(clips, all_words=None):
     out = []
     for clip in clips:
+        pacing = pacing_for_clip(clip, all_words) if all_words else None
+        if pacing:
+            log.info(
+                f"[PACING] seq {clip.get('short_id', '')}: score {pacing['pacing_score']}/20 "
+                f"(wpm {pacing['wpm']}, filler {pacing['filler_ratio']:.1%}, "
+                f"dead_air {pacing['dead_air_gaps']}, burst {pacing['burst_ratio']:.1%})"
+            )
         out.append({
             "debug_id": clip.get("short_id", ""),
             "title": clip.get("Title", ""),
             "text": clip["text"],
             "confidence_score": clip.get("ConfidenceScore", 0),
-            "category": clip.get("Category", "general"),
+            "pacing": pacing,
+            "category": "standard",
             "section_type": clip.get("section_type", ""),
             "section_label": clip.get("section_label", ""),
             "social_media": clip.get("SocialMedia", []),
@@ -2062,15 +2137,23 @@ def format_sequential(clips):
     return out
 
 
-def format_non_sequential(shorts):
+def format_non_sequential(shorts, all_words=None):
     out = []
     for short in shorts:
+        pacing = pacing_for_clip(short, all_words) if all_words else None
+        if pacing:
+            log.info(
+                f"[PACING] nonseq {short.get('short_id', '')}: score {pacing['pacing_score']}/20 "
+                f"(wpm {pacing['wpm']}, filler {pacing['filler_ratio']:.1%}, "
+                f"dead_air {pacing['dead_air_gaps']}, burst {pacing['burst_ratio']:.1%})"
+            )
         out.append({
             "short_id": short.get("short_id", ""),
             "debug_id": short.get("short_id", ""),
             "title": short.get("Title", ""),
             "confidence_score": short.get("ConfidenceScore", 0),
-            "category": short.get("Category", "general"),
+            "pacing": pacing,
+            "category": "standard",
             "social_media": short.get("SocialMedia", []),
             "total_duration": short.get("duration", 0),
             "num_clips": short.get("num_clips", 0),
@@ -2210,15 +2293,10 @@ def run(transcription_data, video_path=None, clip_mode="both"):
         frames_b64 = extract_frames_from_file(video_path)
         log.info(f"[AGENT] Multimodal {'enabled' if frames_b64 else 'disabled'}")
 
-    sentences, video_duration, language_code = preprocess(transcription_data)
+    sentences, video_duration, language_code, all_words = preprocess(transcription_data)
 
-    # ── Stage 0: Detect category + get dynamic scoring weights ────────────────
-    log.info("[AGENT] Stage 0: Detecting video category and computing dynamic weights...")
-    category_info = detect_category_and_weights(sentences)
-    log.info(
-        f"[AGENT] Category: '{category_info['category']}' | "
-        f"Weights (raw): {category_info['weights_raw']}"
-    )
+    scoring_config = get_scoring_config()
+    log.info(f"[AGENT] Standard dimension weights: {scoring_config['weights_raw']}")
 
     # ── Stage 1b: Speaker detection ──────────────────────────────────────────
     log.info("[AGENT] Stage 1b: Detecting speakers and boundaries...")
@@ -2239,14 +2317,16 @@ def run(transcription_data, video_path=None, clip_mode="both"):
     if clip_mode in ("both", "sequential"):
         sequential_clips, seq_log = sequential_selection(
             sentences, windows, video_duration,
-            category_info=category_info,
+            scoring_config=scoring_config,
             frames_b64=frames_b64,
+            all_words=all_words,
         )
 
     if clip_mode in ("both", "non_sequential"):
         non_sequential_shorts, nonseq_log = non_sequential_selection(
             sentences, video_duration,
-            category_info=category_info,
+            scoring_config=scoring_config,
+            all_words=all_words,
         )
 
     sequential_clips, non_sequential_shorts = final_metadata(
@@ -2257,20 +2337,15 @@ def run(transcription_data, video_path=None, clip_mode="both"):
     return {
         "video_duration": video_duration,
         "language_code": language_code,
-        # ── Stage 0 outputs ───────────────────────────────────────────────────
-        "video_category": category_info["category"],
-        "category_reason": category_info["category_reason"],
-        "dimension_weights": category_info["weights_raw"],
-        "weight_reasoning": category_info["weight_reasoning"],
-        "weights_summary": category_info["weights_summary"],
+        "dimension_weights": scoring_config["weights_raw"],
         # ── Stage 1b outputs ──────────────────────────────────────────────────
         "speakers": speakers_payload,
         "speakers_file": SPEAKERS_OUTPUT_PATH,
         # ─────────────────────────────────────────────────────────────────────
         "sentence_count": len(sentences),
         "window_count": len(windows),
-        "sequential_clips": format_sequential(sequential_clips),
-        "non_sequential_shorts": format_non_sequential(non_sequential_shorts),
+        "sequential_clips": format_sequential(sequential_clips, all_words),
+        "non_sequential_shorts": format_non_sequential(non_sequential_shorts, all_words),
         "iteration_log": {
             "sequential": seq_log,
             "non_sequential": nonseq_log,
@@ -2297,10 +2372,7 @@ def main():
         f"[DONE] {len(result['sequential_clips'])} sequential, "
         f"{len(result['non_sequential_shorts'])} non-sequential — written to {OUTPUT_PATH}"
     )
-    log.info(
-        f"[CATEGORY] '{result['video_category']}' | "
-        f"Weights: {result['dimension_weights']}"
-    )
+    log.info(f"[WEIGHTS] Standard dimensions: {result['dimension_weights']}")
     log.info(f"[SPEAKERS] {result.get('speakers', {}).get('total_speakers', 0)} speakers detected")
     log.info(f"[SPEAKERS] Reference file → {result.get('speakers_file', '')}")
     usage = result["token_usage"]
