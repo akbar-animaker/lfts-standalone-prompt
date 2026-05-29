@@ -1,0 +1,1594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LFTS Clip Viewer</title>
+  <style>
+    /* ── Reset & Tokens ───────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #f0f2f7;
+      --surface:     #ffffff;
+      --surface-2:   #f7f8fb;
+      --surface-3:   #eef0f6;
+      --border:      #dde1ec;
+      --border-soft: #e8eaf2;
+      --text:        #1a1d2e;
+      --text-2:      #44495e;
+      --text-3:      #8a90a8;
+      --accent:      #4469e0;
+      --accent-dim:  #eaeefc;
+      --accent-glow: #4469e022;
+      --green:       #16a34a;
+      --green-dim:   #dcfce7;
+      --green-glow:  #16a34a18;
+      --amber:       #d97706;
+      --amber-dim:   #fef3c7;
+      --amber-glow:  #d9770618;
+      --red:         #dc2626;
+      --red-dim:     #fee2e2;
+      --purple:      #7c3aed;
+      --purple-dim:  #ede9fe;
+      --teal:        #0891b2;
+      --seq-color:   var(--green);
+      --non-color:   var(--amber);
+      --radius:      14px;
+      --radius-sm:   8px;
+      --radius-xs:   5px;
+      --shadow:      0 4px 24px #1a1d2e14;
+      --shadow-sm:   0 2px 8px #1a1d2e0c;
+    }
+
+    /* html { scroll-behavior: smooth; } */
+    body {
+      font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ── Scrollbar ────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+    /* ── Header ───────────────────────────────────────────────────────── */
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(255,255,255,0.92);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-weight: 700;
+      font-size: 1.05rem;
+      letter-spacing: -0.01em;
+      color: var(--text);
+      flex-shrink: 0;
+    }
+    .logo-icon {
+      width: 30px; height: 30px;
+      background: linear-gradient(135deg, var(--accent), var(--purple));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+    }
+    .header-meta {
+      font-size: 0.8rem;
+      color: var(--text-3);
+      flex: 1;
+    }
+    .category-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.25rem 0.65rem;
+      background: var(--accent-dim);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      border-radius: 99px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── Banner ───────────────────────────────────────────────────────── */
+    .banner {
+      background: #fffbeb;
+      border-bottom: 1px solid #fde68a;
+      color: #92400e;
+      font-size: 0.82rem;
+      padding: 0.65rem 1.5rem;
+      display: none;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .banner.show { display: flex; }
+    .banner code {
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+      color: #78350f;
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      font-family: "SF Mono", "Fira Code", monospace;
+    }
+
+    /* ── Page Wrapper ─────────────────────────────────────────────────── */
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1.5rem 3rem;
+    }
+
+    /* ── Stats Row ────────────────────────────────────────────────────── */
+    .stats-section {
+      padding: 1.5rem 0 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--purple));
+      opacity: 0.6;
+    }
+    .stat-card:hover { border-color: var(--accent-dim); }
+    .stat-value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: 0.3rem;
+      letter-spacing: -0.02em;
+    }
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-weight: 500;
+    }
+    .stat-icon {
+      position: absolute;
+      top: 1rem; right: 1rem;
+      font-size: 1.4rem;
+      opacity: 0.3;
+    }
+
+    /* ── Tabs ─────────────────────────────────────────────────────────── */
+    .tabs-wrapper {
+      margin-top: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .tabs {
+      display: flex;
+      gap: 0.25rem;
+    }
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-3);
+      padding: 0.65rem 1.1rem;
+      border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      transition: color 0.2s, background 0.2s;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+    .tab-btn:hover { color: var(--text-2); background: var(--surface-2); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-count {
+      font-size: 0.72rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 99px;
+      background: var(--surface-3);
+      color: var(--text-2);
+      font-weight: 600;
+    }
+    .tab-btn.active .tab-count { background: var(--accent-dim); color: var(--accent); }
+    .sort-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+      color: var(--text-3);
+    }
+    .sort-bar select {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      padding: 0.3rem 0.6rem;
+      border-radius: var(--radius-xs);
+      font-size: 0.8rem;
+      cursor: pointer;
+      outline: none;
+    }
+
+    /* ── Panels ───────────────────────────────────────────────────────── */
+    .panel { display: none; padding-top: 1.5rem; }
+    .panel.active { display: block; }
+
+    /* ── Clip Card ────────────────────────────────────────────────────── */
+    .clip-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 1.75rem;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .clip-card:hover {
+      border-color: var(--border-soft);
+      box-shadow: var(--shadow);
+    }
+
+    /* Card accent bar on left */
+    .clip-card.seq-card { border-left: 3px solid var(--green); }
+    .clip-card.non-card { border-left: 3px solid var(--amber); }
+
+    /* ── Card Header ──────────────────────────────────────────────────── */
+    .card-header {
+      padding: 1.1rem 1.4rem;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .card-title-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      flex: 1 1 300px;
+    }
+    .clip-number {
+      flex-shrink: 0;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--surface-3);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-2);
+      margin-top: 2px;
+    }
+    .seq-card .clip-number { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+    .non-card .clip-number { background: var(--amber-dim); border-color: var(--amber); color: var(--amber); }
+    .card-title-text h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      line-height: 1.4;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+    .card-subtitle {
+      font-size: 0.78rem;
+      color: var(--text-3);
+      margin-top: 0.2rem;
+    }
+
+    /* Score Badge */
+    .score-badge {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.2rem;
+    }
+    .score-ring {
+      position: relative;
+      width: 60px; height: 60px;
+    }
+    .score-ring svg { transform: rotate(-90deg); }
+    .score-ring-bg { fill: none; stroke: var(--surface-3); stroke-width: 5; }
+    .score-ring-fill {
+      fill: none;
+      stroke-width: 5;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.6s cubic-bezier(.4,0,.2,1);
+    }
+    .score-ring-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.88rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .score-ring-sub {
+      font-size: 0.55rem;
+      color: var(--text-3);
+      font-weight: 500;
+      margin-top: 1px;
+    }
+    .score-label-text {
+      font-size: 0.65rem;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* Platform + meta badges */
+    .card-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      align-items: center;
+      margin-top: 0.5rem;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.7rem;
+      font-weight: 500;
+      padding: 0.2rem 0.55rem;
+      border-radius: 99px;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .badge-default { background: var(--surface-3); color: var(--text-2); border-color: var(--border); }
+    .badge-yt { background: #fff1f1; color: #b91c1c; border-color: #fecaca; }
+    .badge-ig { background: #fdf4ff; color: #7e22ce; border-color: #e9d5ff; }
+    .badge-tt { background: #f0fdfe; color: #0e7490; border-color: #a5f3fc; }
+    .badge-li { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+    .badge-time { background: var(--surface-3); color: var(--text-2); border-color: var(--border); font-variant-numeric: tabular-nums; }
+
+    /* ── Card Body ────────────────────────────────────────────────────── */
+    .card-body {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-top: 1px solid var(--border-soft);
+    }
+    @media (max-width: 900px) {
+      .card-body { grid-template-columns: 1fr; }
+    }
+
+    /* Video Column */
+    .video-col {
+      padding: 1rem;
+      background: var(--surface-2);
+      border-right: 1px solid var(--border-soft);
+    }
+    @media (max-width: 900px) {
+      .video-col { border-right: none; border-bottom: 1px solid var(--border-soft); }
+    }
+    .video-wrapper {
+      position: relative;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      background: #111;
+    }
+    video {
+      width: 100%;
+      display: block;
+      max-height: 280px;
+      object-fit: contain;
+      background: #111;
+    }
+    .video-controls {
+      margin-top: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .time-info {
+      font-size: 0.75rem;
+      color: var(--text-3);
+      font-variant-numeric: tabular-nums;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .time-info .dot { color: var(--border); }
+    .play-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.55rem 1rem;
+      border-radius: var(--radius-xs);
+      border: 1px solid var(--accent);
+      background: var(--accent-dim);
+      color: var(--accent);
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 600;
+      transition: all 0.15s;
+      width: 100%;
+    }
+    .play-btn:hover { background: var(--accent); color: #fff; }
+    .play-btn:active { transform: scale(0.98); }
+    .playback-status {
+      font-size: 0.73rem;
+      color: var(--amber);
+      font-variant-numeric: tabular-nums;
+      min-height: 16px;
+      text-align: center;
+    }
+
+    /* Segment chapters for non-sequential */
+    .segment-list {
+      margin-top: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+    .segment-item {
+      padding: 0.4rem 0.6rem;
+      border-radius: var(--radius-xs);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-size: 0.78rem;
+      color: var(--text-2);
+      background: var(--surface-2);
+    }
+    .segment-item:hover { border-color: var(--border); color: var(--text); }
+    .segment-item.active { background: var(--accent-dim); border-color: var(--accent); color: var(--text); }
+    .segment-time {
+      font-size: 0.68rem;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+      display: block;
+      margin-bottom: 0.1rem;
+      font-weight: 600;
+    }
+    .segment-item.active .segment-time { color: var(--text-2); }
+
+    /* Transcript Column */
+    .transcript-col {
+      padding: 1rem 1.25rem;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .col-label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-3);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .col-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border-soft);
+    }
+    .sentence {
+      padding: 0.4rem 0.6rem;
+      border-radius: var(--radius-xs);
+      margin-bottom: 0.4rem;
+      border-left: 2px solid transparent;
+      font-size: 0.85rem;
+      color: var(--text-2);
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .sentence.in-range { background: var(--surface-2); border-left-color: var(--border); }
+    .sentence.active {
+      background: var(--accent-dim);
+      border-left-color: var(--accent);
+      color: var(--text);
+    }
+    .sentence-time {
+      font-size: 0.65rem;
+      color: var(--text-3);
+      font-variant-numeric: tabular-nums;
+      display: block;
+      margin-bottom: 0.1rem;
+      font-weight: 600;
+    }
+    .sentence.active .sentence-time { color: var(--accent); }
+    .no-transcript { font-size: 0.82rem; color: var(--text-3); padding: 0.5rem 0; }
+
+    /* ── Card Footer: Score + Meta ────────────────────────────────────── */
+    .card-footer {
+      border-top: 1px solid var(--border-soft);
+      padding: 1rem 1.4rem;
+    }
+    .footer-sections {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    /* Collapsible Section */
+    .collapsible-section { border-top: 1px solid var(--border-soft); }
+    .collapsible-section:first-child { border-top: none; }
+    .section-toggle {
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: var(--text-2);
+      padding: 0.7rem 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-align: left;
+      transition: color 0.15s;
+    }
+    .section-toggle:hover { color: var(--text); }
+    .section-toggle .toggle-icon {
+      margin-left: auto;
+      font-size: 0.7rem;
+      color: var(--text-3);
+      transition: transform 0.2s;
+    }
+    .section-toggle.open .toggle-icon { transform: rotate(180deg); }
+    .section-content {
+      padding-bottom: 0.75rem;
+      display: none;
+    }
+    .section-content.open { display: block; }
+
+    /* Score Breakdown */
+    .score-dims {
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+    }
+    .score-dim {
+      display: grid;
+      grid-template-columns: 130px 1fr 45px;
+      align-items: center;
+      gap: 0.65rem;
+      font-size: 0.8rem;
+    }
+    .dim-label {
+      color: var(--text-2);
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dim-bar-track {
+      height: 6px;
+      background: var(--surface-3);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .dim-bar-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width 0.5s cubic-bezier(.4,0,.2,1);
+    }
+    .dim-value {
+      font-size: 0.75rem;
+      color: var(--text-3);
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      font-weight: 600;
+    }
+    .dim-value.high { color: var(--green); }
+    .dim-value.mid  { color: var(--amber); }
+    .dim-value.low  { color: var(--red); }
+
+    /* Score reasoning tooltip trigger */
+    .dim-label[title] { cursor: help; border-bottom: 1px dashed var(--border); }
+
+    /* Weakest Factor */
+    .weak-alert {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.55rem 0.75rem;
+      background: var(--red-dim);
+      border: 1px solid #fca5a5;
+      border-radius: var(--radius-xs);
+      font-size: 0.8rem;
+      margin-bottom: 0.1rem;
+    }
+    .weak-icon { font-size: 1rem; }
+    .weak-text { flex: 1; color: var(--text-2); }
+    .weak-name { color: var(--red); font-weight: 600; }
+
+    /* Reason / Improvise */
+    .reason-block {
+      padding: 0.7rem 0.85rem;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xs);
+      font-size: 0.83rem;
+      line-height: 1.7;
+      color: var(--text-2);
+      margin-bottom: 0.6rem;
+    }
+    .reason-block:last-child { margin-bottom: 0; }
+    .reason-block strong {
+      display: block;
+      margin-bottom: 0.3rem;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-3);
+      font-weight: 700;
+    }
+
+    /* Full text block */
+    .full-text-block {
+      padding: 0.7rem 0.85rem;
+      background: var(--surface-2);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-xs);
+      font-size: 0.82rem;
+      line-height: 1.7;
+      color: var(--text-2);
+      max-height: 120px;
+      overflow-y: auto;
+    }
+
+    /* ── Loading / Error ──────────────────────────────────────────────── */
+    .state-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 5rem 2rem;
+      gap: 1rem;
+      text-align: center;
+    }
+    .loader {
+      width: 40px; height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .state-screen p { color: var(--text-3); font-size: 0.88rem; }
+    .error-screen { color: var(--red); }
+    .error-screen .error-icon { font-size: 2.5rem; }
+
+    /* ── Category Info Panel ──────────────────────────────────────────── */
+    .category-info-bar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      margin: 1.5rem 0 0;
+      display: none;
+      gap: 1.25rem;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+    .category-info-bar.show { display: flex; }
+    .cat-label {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-3);
+      margin-bottom: 0.25rem;
+      font-weight: 600;
+    }
+    .cat-value { font-size: 0.85rem; color: var(--text-2); line-height: 1.5; }
+    .cat-section { flex: 1 1 200px; }
+    .weights-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin-top: 0.3rem;
+    }
+    .weight-chip {
+      font-size: 0.7rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 99px;
+      background: var(--surface-3);
+      color: var(--text-2);
+      border: 1px solid var(--border);
+      font-weight: 500;
+    }
+    .weight-chip.high { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+    /* ── Empty State ──────────────────────────────────────────────────── */
+    .empty {
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-3);
+      font-size: 0.88rem;
+    }
+    .empty-icon { font-size: 2rem; display: block; margin-bottom: 0.5rem; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">✂</div>
+        LFTS Clip Viewer
+      </div>
+      <div class="header-meta">
+        <span id="header-category-chip"></span>
+      </div>
+      <div id="header-stats-inline" style="font-size:0.78rem;color:var(--text-3);display:none;gap:1rem;flex-shrink:0;" class="header-stats"></div>
+    </div>
+  </header>
+
+  <!-- File:// banner -->
+  <div id="banner" class="banner">
+    <span>⚠</span>
+    Serve this page over a local server — <code>file://</code> blocks JSON &amp; video fetch.
+    Run: <code>python3 -m http.server 8080</code> then open <code>http://localhost:8080/viewer.html</code>
+  </div>
+
+  <div class="page">
+    <!-- Stats -->
+    <div id="stats-section" class="stats-section" hidden></div>
+
+    <!-- Category Info -->
+    <div id="category-info" class="category-info-bar"></div>
+
+    <!-- Tabs -->
+    <div id="tabs-wrapper" class="tabs-wrapper" hidden>
+      <div class="tabs">
+        <button type="button" class="tab-btn active" data-tab="seq">
+          ✂ Sequential <span class="tab-count" id="count-seq">0</span>
+        </button>
+        <button type="button" class="tab-btn" data-tab="non">
+          ⚡ Non-Sequential <span class="tab-count" id="count-non">0</span>
+        </button>
+      </div>
+      <div class="sort-bar">
+        <span>Sort by</span>
+        <select id="sort-select">
+          <option value="default">Default order</option>
+          <option value="score-desc">Score ↓</option>
+          <option value="score-asc">Score ↑</option>
+          <option value="duration-desc">Duration ↓</option>
+          <option value="duration-asc">Duration ↑</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading" class="state-screen">
+      <div class="loader"></div>
+      <p>Loading <code>result.json</code> and <code>transcript1.json</code>…</p>
+    </div>
+
+    <!-- Error -->
+    <div id="error" class="state-screen error-screen" hidden>
+      <span class="error-icon">⚠</span>
+      <p id="error-msg"></p>
+    </div>
+
+    <!-- Panels -->
+    <section id="panel-seq" class="panel active" data-type="seq"></section>
+    <section id="panel-non" class="panel" data-type="non"></section>
+  </div>
+
+  <script>
+    /* ── Config ─────────────────────────────────────────────────────────── */
+    const VIDEO_SRC      = "input.mp4";
+    const RESULT_SRC     = "result.json";
+    const TRANSCRIPT_SRC = "transcript.json";
+
+    /* ── State ──────────────────────────────────────────────────────────── */
+    let sentences = [];
+    let resultData = null;
+    let dimWeights = {};
+
+    /* ── Helpers ────────────────────────────────────────────────────────── */
+    function fmt(sec) {
+      const s = Math.max(0, Number(sec) || 0);
+      const m = Math.floor(s / 60);
+      const r = (s % 60).toFixed(1).padStart(4, "0");
+      return `${m}:${r}`;
+    }
+
+    function esc(str) {
+      return String(str || "")
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    function scoreColor(val, max) {
+      const pct = val / max;
+      if (pct >= 0.75) return "var(--green)";
+      if (pct >= 0.5)  return "var(--amber)";
+      return "var(--red)";
+    }
+    function scoreClass(val, max) {
+      const pct = val / max;
+      if (pct >= 0.75) return "high";
+      if (pct >= 0.5)  return "mid";
+      return "low";
+    }
+
+    function platformBadge(platform) {
+      const p = String(platform).toLowerCase();
+      if (p.includes("youtube")) return `<span class="badge badge-yt">▶ YouTube Shorts</span>`;
+      if (p.includes("instagram")) return `<span class="badge badge-ig">◈ Instagram</span>`;
+      if (p.includes("tiktok")) return `<span class="badge badge-tt">◆ TikTok</span>`;
+      if (p.includes("linkedin")) return `<span class="badge badge-li">⬡ LinkedIn</span>`;
+      return `<span class="badge badge-default">${esc(platform)}</span>`;
+    }
+
+    /* ── Build sentences from transcript ───────────────────────────────── */
+    function buildSentences(transcriptionData) {
+      const items = transcriptionData.items || [];
+      const out = [];
+      let words = [], start = null, end = null;
+      for (const item of items) {
+        if (item.type === "pronunciation") {
+          const word = item.alternatives[0].content;
+          const st = parseFloat(item.start_time || 0);
+          const en = parseFloat(item.end_time || 0);
+          if (start === null) start = st;
+          end = en;
+          words.push(word);
+        } else if (item.type === "punctuation") {
+          const p = item.alternatives[0].content;
+          if (words.length) words[words.length - 1] += p;
+          if (".?!".includes(p) && words.length && start !== null) {
+            out.push({ index: out.length + 1,
+              start: Math.round(start * 100) / 100,
+              end: Math.round(end * 100) / 100,
+              text: words.join(" ") });
+            words = []; start = null; end = null;
+          }
+        }
+      }
+      if (words.length && start !== null)
+        out.push({ index: out.length + 1,
+          start: Math.round(start * 100) / 100,
+          end: Math.round(end * 100) / 100,
+          text: words.join(" ") });
+      return out;
+    }
+
+    function sentencesInRange(s, e) {
+      return sentences.filter(x => x.end >= s && x.start <= e);
+    }
+
+    /* ── Score ring SVG ─────────────────────────────────────────────────── */
+    function makeScoreRing(score, color) {
+      const r = 24; const circ = 2 * Math.PI * r;
+      const pct = Math.max(0, Math.min(100, score)) / 100;
+      const dash = circ * pct;
+      return `
+        <div class="score-ring">
+          <svg viewBox="0 0 56 56" width="56" height="56">
+            <circle class="score-ring-bg" cx="28" cy="28" r="${r}"/>
+            <circle class="score-ring-fill" cx="28" cy="28" r="${r}"
+              stroke="${color}"
+              stroke-dasharray="${dash} ${circ}"
+              stroke-dashoffset="0"/>
+          </svg>
+          <div class="score-ring-text" style="color:${color}">
+            ${score}<div class="score-ring-sub">/ 100</div>
+          </div>
+        </div>`;
+    }
+
+    /* ── Render transcript sidebar ─────────────────────────────────────── */
+    function renderTranscript(container, rangeStart, rangeEnd, videoEl) {
+      container.innerHTML = "";
+      const label = document.createElement("div");
+      label.className = "col-label";
+      label.textContent = "Transcript";
+      container.appendChild(label);
+
+      const inRange = sentencesInRange(rangeStart, rangeEnd);
+      if (!inRange.length) {
+        const p = document.createElement("p");
+        p.className = "no-transcript";
+        p.textContent = "No transcript sentences in this range.";
+        container.appendChild(p);
+        return;
+      }
+      const els = [];
+      for (const s of inRange) {
+        const div = document.createElement("div");
+        div.className = "sentence in-range";
+        div.dataset.start = s.start;
+        div.dataset.end = s.end;
+        div.innerHTML = `<span class="sentence-time">${fmt(s.start)} – ${fmt(s.end)}</span>${esc(s.text)}`;
+        container.appendChild(div);
+        els.push(div);
+      }
+      if (videoEl) {
+        videoEl.addEventListener("timeupdate", () => {
+          const t = videoEl.currentTime;
+          els.forEach(el => {
+            const st = parseFloat(el.dataset.start);
+            const en = parseFloat(el.dataset.end);
+            const active = t >= st - 0.05 && t <= en + 0.15;
+            el.classList.toggle("active", active);
+            // if (active) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+          });
+        });
+      }
+    }
+
+    /* ── Score breakdown section ───────────────────────────────────────── */
+    const DIMENSIONS = [
+      { key: "hook_strength",       label: "Hook Strength" },
+      { key: "reframe_insight",     label: "Reframe / Insight" },
+      { key: "emotional_resonance", label: "Emotional Resonance" },
+      { key: "standalone_clarity",  label: "Standalone Clarity" },
+      { key: "quotability",         label: "Quotability" },
+      { key: "clean_ending",        label: "Clean Ending" },
+    ];
+
+    function buildScoreSection(breakdown, reasoning, weakest) {
+      const wrap = document.createElement("div");
+      wrap.className = "collapsible-section";
+
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "section-toggle open";
+      toggle.innerHTML = `<span>📊</span> Score Breakdown <span class="toggle-icon">▾</span>`;
+      wrap.appendChild(toggle);
+
+      const content = document.createElement("div");
+      content.className = "section-content open";
+
+      // Weakest factor
+      if (weakest) {
+        content.innerHTML = `
+          <div class="weak-alert" style="margin-bottom:0.75rem;">
+            <span class="weak-icon">⚠</span>
+            <span class="weak-text">Weakest factor: <span class="weak-name">${esc(weakest.replace(/_/g, " "))}</span></span>
+          </div>`;
+      }
+
+      const dimsEl = document.createElement("div");
+      dimsEl.className = "score-dims";
+      DIMENSIONS.forEach(dim => {
+        const val = (breakdown && breakdown[dim.key]) || 0;
+        const maxVal = dimWeights[dim.key] || 20;
+        const pct = (val / maxVal) * 100;
+        const color = scoreColor(val, maxVal);
+        const cls = scoreClass(val, maxVal);
+        const reason = (reasoning && reasoning[dim.key]) || "";
+        const dimEl = document.createElement("div");
+        dimEl.className = "score-dim";
+        dimEl.innerHTML = `
+          <span class="dim-label" title="${esc(reason)}">${dim.label}</span>
+          <div class="dim-bar-track"><div class="dim-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+          <span class="dim-value ${cls}">${val}/${maxVal}</span>`;
+        dimsEl.appendChild(dimEl);
+      });
+      content.appendChild(dimsEl);
+      wrap.appendChild(content);
+
+      toggle.addEventListener("click", () => {
+        toggle.classList.toggle("open");
+        content.classList.toggle("open");
+      });
+
+      return wrap;
+    }
+
+    /* ── Reason / Improve section ──────────────────────────────────────── */
+    function buildReasonSection(reason, improvise) {
+      if (!reason && !improvise) return null;
+      const wrap = document.createElement("div");
+      wrap.className = "collapsible-section";
+
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "section-toggle";
+      toggle.innerHTML = `<span>💡</span> AI Reasoning <span class="toggle-icon">▾</span>`;
+      wrap.appendChild(toggle);
+
+      const content = document.createElement("div");
+      content.className = "section-content";
+      if (reason)    content.innerHTML += `<div class="reason-block"><strong>Overall Assessment</strong>${esc(reason)}</div>`;
+      if (improvise) content.innerHTML += `<div class="reason-block"><strong>How to Improve</strong>${esc(improvise)}</div>`;
+      wrap.appendChild(content);
+
+      toggle.addEventListener("click", () => {
+        toggle.classList.toggle("open");
+        content.classList.toggle("open");
+      });
+
+      return wrap;
+    }
+
+    /* ── Full text section ─────────────────────────────────────────────── */
+    function buildTextSection(text) {
+      if (!text) return null;
+      const wrap = document.createElement("div");
+      wrap.className = "collapsible-section";
+
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "section-toggle";
+      toggle.innerHTML = `<span>📝</span> Full Transcript Text <span class="toggle-icon">▾</span>`;
+      wrap.appendChild(toggle);
+
+      const content = document.createElement("div");
+      content.className = "section-content";
+      content.innerHTML = `<div class="full-text-block">${esc(text)}</div>`;
+      wrap.appendChild(content);
+
+      toggle.addEventListener("click", () => {
+        toggle.classList.toggle("open");
+        content.classList.toggle("open");
+      });
+
+      return wrap;
+    }
+
+    /* ── Multi-segment player ──────────────────────────────────────────── */
+    function attachMultiSegmentPlayer(video, segments, { playBtn, status, segItems, onTime }) {
+      if (!segments.length) return;
+
+      const END_EPS = 0.08;
+      const clipStart = segments[0].start;
+      const clipEnd   = segments[segments.length - 1].end;
+      let segIdx = 0;
+      let playThrough = false;
+
+      function segmentIndexAt(t) {
+        return segments.findIndex(s => t >= s.start - END_EPS && t < s.end);
+      }
+
+      function setIdx(i) {
+        segIdx = Math.max(0, Math.min(i, segments.length - 1));
+        segItems.forEach((li, j) => li.classList.toggle("active", j === segIdx));
+        const seg = segments[segIdx];
+        status.textContent = `Segment ${segIdx + 1}/${segments.length} · ${fmt(seg.start)}–${fmt(seg.end)}`;
+      }
+
+      function finishShort() {
+        playThrough = false;
+        video.pause();
+        video.currentTime = Math.max(clipStart, clipEnd - 0.05);
+        status.textContent = "✓ Finished";
+        onTime?.(video.currentTime);
+      }
+
+      function go(i, play) {
+        if (i < 0 || i >= segments.length) return false;
+        setIdx(i);
+        video.currentTime = segments[i].start + 0.01;
+        if (play) video.play().catch(() => {});
+        return true;
+      }
+
+      function skipGapForward(t) {
+        const next = segments.findIndex(s => s.start > t + END_EPS);
+        if (next >= 0) return go(next, true);
+        if (t >= clipEnd - END_EPS) finishShort();
+        return false;
+      }
+
+      function onPlaybackTick() {
+        const t = video.currentTime;
+
+        // Hard stop: never play past the last segment end (native controls included)
+        if (t >= clipEnd - END_EPS) {
+          finishShort();
+          return;
+        }
+
+        const i = segmentIndexAt(t);
+
+        if (playThrough) {
+          if (i >= 0) {
+            if (i !== segIdx) setIdx(i);
+            const cur = segments[segIdx];
+            if (t >= cur.end - END_EPS) {
+              if (segIdx + 1 < segments.length) go(segIdx + 1, true);
+              else finishShort();
+              return;
+            }
+          } else {
+            // Between segments — skip gap instead of playing source filler
+            skipGapForward(t);
+            return;
+          }
+        } else if (!video.paused && i >= 0) {
+          // Single-segment / native play: stop at segment end
+          if (t >= segments[segments.length - 1].end) {
+            video.pause();
+            video.currentTime = segments[i].end - 0.05;
+            status.textContent = "✓ Segment done";
+          }
+        }
+
+        onTime?.(video.currentTime);
+      }
+
+      video.addEventListener("loadedmetadata", () => {
+        video.currentTime = clipStart + 0.01;
+      });
+
+      video.addEventListener("timeupdate", onPlaybackTick);
+
+      video.addEventListener("play", () => {
+        const t = video.currentTime;
+        if (t >= clipEnd - END_EPS) {
+          video.pause();
+          video.currentTime = clipStart + 0.01;
+          return;
+        }
+        const i = segmentIndexAt(t);
+        if (i >= 0) setIdx(i);
+        else if (playThrough) skipGapForward(t);
+        else setIdx(0);
+      });
+
+      video.addEventListener("seeked", () => {
+        const t = video.currentTime;
+        if (t > clipEnd) video.currentTime = clipEnd - 0.05;
+        const i = segmentIndexAt(video.currentTime);
+        if (i >= 0) setIdx(i);
+      });
+
+      playBtn.addEventListener("click", () => { playThrough = true; go(0, true); });
+      segItems.forEach((li, i) => li.addEventListener("click", () => {
+        playThrough = true;
+        go(i, true);
+      }));
+
+      setIdx(0);
+    }
+
+    /* ── Sequential Card ────────────────────────────────────────────────── */
+    function renderSequential(clips, container) {
+      if (!clips.length) {
+        container.innerHTML = `<div class="empty"><span class="empty-icon">📭</span>No sequential clips found.</div>`;
+        return;
+      }
+      clips.forEach((clip, i) => {
+        const start = clip.video_start_time;
+        const end   = clip.video_end_time;
+        const dur   = (end - start).toFixed(1);
+        const score = clip.confidence_score ?? 0;
+        const ringColor = scoreColor(score, 100);
+
+        const card = document.createElement("article");
+        card.className = "clip-card seq-card";
+
+        // Header
+        card.innerHTML = `
+          <div class="card-header">
+            <div class="card-title-row">
+              <div class="clip-number">${i + 1}</div>
+              <div class="card-title-text">
+                <h2>${esc(clip.title || "Untitled")}</h2>
+                <div class="card-subtitle">${esc(clip.section_label || clip.section_type || "")}</div>
+                <div class="card-badges">
+                  <span class="badge badge-time">⏱ ${fmt(start)} → ${fmt(end)} · ${dur}s</span>
+                  ${(clip.social_media || []).map(platformBadge).join("")}
+                  ${clip.category ? `<span class="badge badge-default">${esc(clip.category)}</span>` : ""}
+                  ${clip.debug_id ? `<span class="badge badge-default">${esc(clip.debug_id)}</span>` : ""}
+                </div>
+              </div>
+            </div>
+            <div class="score-badge">
+              ${makeScoreRing(score, ringColor)}
+              <span class="score-label-text">Confidence</span>
+            </div>
+          </div>`;
+
+        // Body: video + transcript
+        const body = document.createElement("div");
+        body.className = "card-body";
+
+        // Video col
+        const videoCol = document.createElement("div");
+        videoCol.className = "video-col";
+        const video = document.createElement("video");
+        video.controls = true;
+        video.preload = "metadata";
+        video.src = VIDEO_SRC;
+        video.addEventListener("loadedmetadata", () => { video.currentTime = start + 0.01; });
+
+        const status = document.createElement("div");
+        status.className = "playback-status";
+
+        video.addEventListener("timeupdate", () => {
+          if (video.currentTime >= end - 0.1) {
+            video.pause();
+            status.textContent = "✓ Finished";
+          } else if (video.currentTime >= start) {
+            const remaining = end - video.currentTime;
+            status.textContent = `▶ ${fmt(video.currentTime)} — ${remaining.toFixed(1)}s remaining`;
+          }
+        });
+
+        const playBtn = document.createElement("button");
+        playBtn.type = "button";
+        playBtn.className = "play-btn";
+        playBtn.innerHTML = `▶&nbsp; Play Clip`;
+        playBtn.addEventListener("click", () => {
+          video.currentTime = start + 0.01;
+          video.play().catch(() => {});
+          status.textContent = "Playing…";
+        });
+
+        videoCol.innerHTML = `<div class="video-wrapper"></div><div class="video-controls"></div>`;
+        videoCol.querySelector(".video-wrapper").appendChild(video);
+        const ctrl = videoCol.querySelector(".video-controls");
+        ctrl.innerHTML = `<div class="time-info">
+          <span>${fmt(start)}</span><span class="dot">→</span><span>${fmt(end)}</span>
+          <span class="dot">·</span><span>${dur}s</span>
+        </div>`;
+        ctrl.appendChild(playBtn);
+        ctrl.appendChild(status);
+
+        // Transcript col
+        const transcriptCol = document.createElement("div");
+        transcriptCol.className = "transcript-col";
+        renderTranscript(transcriptCol, start, end, video);
+
+        body.appendChild(videoCol);
+        body.appendChild(transcriptCol);
+        card.appendChild(body);
+
+        // Footer
+        const footer = document.createElement("div");
+        footer.className = "card-footer";
+        const footerSections = document.createElement("div");
+        footerSections.className = "footer-sections";
+
+        footerSections.appendChild(buildScoreSection(clip.score_breakdown, clip.score_reasoning, clip.weakest_factor));
+        const reasonSec = buildReasonSection(clip.reason, clip.improvise);
+        if (reasonSec) footerSections.appendChild(reasonSec);
+        const textSec = buildTextSection(clip.text);
+        if (textSec) footerSections.appendChild(textSec);
+
+        footer.appendChild(footerSections);
+        card.appendChild(footer);
+        container.appendChild(card);
+      });
+    }
+
+    /* ── Non-sequential Card ────────────────────────────────────────────── */
+    function renderNonSequential(shorts, container) {
+      if (!shorts.length) {
+        container.innerHTML = `<div class="empty"><span class="empty-icon">📭</span>No non-sequential shorts found.</div>`;
+        return;
+      }
+      shorts.forEach((short, i) => {
+        const segments = (short.clips || []).map(c => ({
+          start: parseFloat(c.startTime) || 0,
+          end:   parseFloat(c.endTime) || 0,
+          text:  c.text || "",
+        }));
+        const rangeStart = segments.length ? segments[0].start : 0;
+        const rangeEnd   = segments.length ? segments[segments.length - 1].end : 0;
+        const totalDur   = short.total_duration || segments.reduce((s, x) => s + (x.end - x.start), 0);
+        const score      = short.confidence_score ?? 0;
+        const ringColor  = scoreColor(score, 100);
+
+        const card = document.createElement("article");
+        card.className = "clip-card non-card";
+
+        card.innerHTML = `
+          <div class="card-header">
+            <div class="card-title-row">
+              <div class="clip-number">${i + 1}</div>
+              <div class="card-title-text">
+                <h2>${esc(short.title || "Untitled")}</h2>
+                <div class="card-subtitle">${segments.length} segments · ${totalDur.toFixed(1)}s playable</div>
+                <div class="card-badges">
+                  <span class="badge badge-time">⏱ Spans ${fmt(rangeStart)} → ${fmt(rangeEnd)}</span>
+                  ${(short.social_media || []).map(platformBadge).join("")}
+                  ${short.category ? `<span class="badge badge-default">${esc(short.category)}</span>` : ""}
+                  ${short.short_id  ? `<span class="badge badge-default">${esc(short.short_id)}</span>` : ""}
+                </div>
+              </div>
+            </div>
+            <div class="score-badge">
+              ${makeScoreRing(score, ringColor)}
+              <span class="score-label-text">Confidence</span>
+            </div>
+          </div>`;
+
+        const body = document.createElement("div");
+        body.className = "card-body";
+
+        const videoCol = document.createElement("div");
+        videoCol.className = "video-col";
+
+        const video = document.createElement("video");
+        video.controls = true; video.preload = "metadata"; video.src = VIDEO_SRC;
+
+        const status = document.createElement("div");
+        status.className = "playback-status";
+
+        const playBtn = document.createElement("button");
+        playBtn.type = "button";
+        playBtn.className = "play-btn";
+        playBtn.innerHTML = `▶&nbsp; Play All Segments`;
+
+        videoCol.innerHTML = `<div class="video-wrapper"></div><div class="video-controls"></div>`;
+        videoCol.querySelector(".video-wrapper").appendChild(video);
+        const ctrl = videoCol.querySelector(".video-controls");
+        ctrl.innerHTML = `<div class="time-info">
+          <span>${segments.length} cuts</span>
+          <span class="dot">·</span>
+          <span>${totalDur.toFixed(1)}s total</span>
+        </div>`;
+        ctrl.appendChild(playBtn);
+        ctrl.appendChild(status);
+
+        // Segment chapter list
+        const segList = document.createElement("div");
+        segList.className = "segment-list";
+        const segItems = [];
+        segments.forEach((seg, j) => {
+          const li = document.createElement("div");
+          li.className = "segment-item";
+          li.innerHTML = `<span class="segment-time">${fmt(seg.start)} – ${fmt(seg.end)}</span>${esc(seg.text)}`;
+          segList.appendChild(li);
+          segItems.push(li);
+        });
+        ctrl.appendChild(segList);
+
+        const transcriptCol = document.createElement("div");
+        transcriptCol.className = "transcript-col";
+        renderTranscript(transcriptCol, rangeStart, rangeEnd, video);
+
+        attachMultiSegmentPlayer(video, segments, {
+          playBtn, status, segItems,
+          onTime: t => {
+            transcriptCol.querySelectorAll(".sentence").forEach(el => {
+              const st = parseFloat(el.dataset.start);
+              const en = parseFloat(el.dataset.end);
+              const active = t >= st - 0.05 && t <= en + 0.15;
+              el.classList.toggle("active", active);
+              // if (active) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+            });
+          },
+        });
+
+        body.appendChild(videoCol);
+        body.appendChild(transcriptCol);
+        card.appendChild(body);
+
+        const footer = document.createElement("div");
+        footer.className = "card-footer";
+        const footerSections = document.createElement("div");
+        footerSections.className = "footer-sections";
+
+        footerSections.appendChild(buildScoreSection(short.score_breakdown, short.score_reasoning, short.weakest_factor));
+        const reasonSec = buildReasonSection(short.reason, short.improvise);
+        if (reasonSec) footerSections.appendChild(reasonSec);
+        const combinedText = segments.map(s => s.text).join(" ");
+        const textSec = buildTextSection(combinedText);
+        if (textSec) footerSections.appendChild(textSec);
+
+        footer.appendChild(footerSections);
+        card.appendChild(footer);
+        container.appendChild(card);
+      });
+    }
+
+    /* ── Stats ─────────────────────────────────────────────────────────── */
+    function renderStats(result) {
+      const el = document.getElementById("stats-section");
+      el.hidden = false;
+      const seqCount  = result.sequential_clips?.length ?? 0;
+      const nonCount  = result.non_sequential_shorts?.length ?? 0;
+      const dur       = result.video_duration || 0;
+      const sentCount = result.sentence_count ?? sentences.length;
+      const tokens    = result.token_usage?.total_tokens ?? 0;
+
+      const avgSeqScore = seqCount ? Math.round(
+        result.sequential_clips.reduce((s, c) => s + (c.confidence_score || 0), 0) / seqCount
+      ) : 0;
+
+      el.innerHTML = `
+        <div class="stat-card">
+          <div class="stat-icon">✂</div>
+          <div class="stat-value" style="color:var(--green)">${seqCount}</div>
+          <div class="stat-label">Sequential Clips</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">⚡</div>
+          <div class="stat-value" style="color:var(--amber)">${nonCount}</div>
+          <div class="stat-label">Non-Sequential Shorts</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">⏱</div>
+          <div class="stat-value" style="color:var(--accent)">${fmt(dur)}</div>
+          <div class="stat-label">Source Duration</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📝</div>
+          <div class="stat-value" style="color:var(--text-2)">${sentCount}</div>
+          <div class="stat-label">Sentences</div>
+        </div>
+        ${avgSeqScore ? `
+        <div class="stat-card">
+          <div class="stat-icon">⭐</div>
+          <div class="stat-value" style="color:${scoreColor(avgSeqScore, 100)}">${avgSeqScore}</div>
+          <div class="stat-label">Avg Confidence</div>
+        </div>` : ""}
+        ${tokens ? `
+        <div class="stat-card">
+          <div class="stat-icon">🔢</div>
+          <div class="stat-value" style="color:var(--purple)">${(tokens / 1000).toFixed(1)}k</div>
+          <div class="stat-label">Tokens Used</div>
+        </div>` : ""}
+      `;
+    }
+
+    /* ── Category Info Bar ─────────────────────────────────────────────── */
+    function renderCategoryInfo(result) {
+      const el = document.getElementById("category-info");
+      const weightsRaw = result.dimension_weights || {};
+      const weightReason = result.weight_reasoning || {};
+      const sorted = Object.entries(weightsRaw).sort((a,b) => b[1]-a[1]);
+
+      el.classList.add("show");
+      el.innerHTML = `
+        <div class="cat-section">
+          <div class="cat-label">Detected Category</div>
+          <div class="cat-value"><strong style="color:var(--accent)">${esc(result.video_category || "—")}</strong></div>
+          <div class="cat-value" style="margin-top:0.3rem;font-size:0.78rem;">${esc(result.category_reason || "")}</div>
+        </div>
+        <div class="cat-section" style="flex:2 1 300px">
+          <div class="cat-label">Scoring Weights</div>
+          <div class="weights-chips">
+            ${sorted.map(([k, v]) => {
+              const isHigh = v >= 20;
+              return `<span class="weight-chip ${isHigh ? 'high' : ''}" title="${esc(weightReason[k] || '')}">${k.replace(/_/g," ")} ${v}%</span>`;
+            }).join("")}
+          </div>
+          ${result.weights_summary ? `<div class="cat-value" style="margin-top:0.5rem;font-size:0.78rem;">${esc(result.weights_summary)}</div>` : ""}
+        </div>`;
+
+      // Header chip
+      const chip = document.getElementById("header-category-chip");
+      if (result.video_category) {
+        chip.innerHTML = `<span class="category-chip">🎬 ${esc(result.video_category)}</span>`;
+      }
+    }
+
+    /* ── Sort ───────────────────────────────────────────────────────────── */
+    let seqClips = [], nonShorts = [];
+
+    function sortItems(items, mode) {
+      const copy = [...items];
+      if (mode === "score-desc") return copy.sort((a,b) => (b.confidence_score||0) - (a.confidence_score||0));
+      if (mode === "score-asc")  return copy.sort((a,b) => (a.confidence_score||0) - (b.confidence_score||0));
+      if (mode === "duration-desc") {
+        return copy.sort((a,b) => {
+          const da = a.total_duration || (a.video_end_time - a.video_start_time) || 0;
+          const db = b.total_duration || (b.video_end_time - b.video_start_time) || 0;
+          return db - da;
+        });
+      }
+      if (mode === "duration-asc") {
+        return copy.sort((a,b) => {
+          const da = a.total_duration || (a.video_end_time - a.video_start_time) || 0;
+          const db = b.total_duration || (b.video_end_time - b.video_start_time) || 0;
+          return da - db;
+        });
+      }
+      return copy;
+    }
+
+    function rerenderActive(mode) {
+      const activePanel = document.querySelector(".panel.active");
+      const type = activePanel?.id === "panel-seq" ? "seq" : "non";
+      activePanel.innerHTML = "";
+      if (type === "seq") renderSequential(sortItems(seqClips, mode), activePanel);
+      else renderNonSequential(sortItems(nonShorts, mode), activePanel);
+    }
+
+    /* ── Init ────────────────────────────────────────────────────────────── */
+    async function init() {
+      if (location.protocol === "file:") {
+        document.getElementById("banner").classList.add("show");
+      }
+
+      try {
+        const [resR, trR] = await Promise.all([
+          fetch(RESULT_SRC),
+          fetch(TRANSCRIPT_SRC),
+        ]);
+        if (!resR.ok) throw new Error(`Cannot load ${RESULT_SRC} (HTTP ${resR.status})`);
+        if (!trR.ok)  throw new Error(`Cannot load ${TRANSCRIPT_SRC} (HTTP ${trR.status})`);
+        const result     = await resR.json();
+        const trRaw      = await trR.json();
+        const trData     = trRaw.results || trRaw;
+        sentences        = buildSentences(trData);
+        resultData       = result;
+        dimWeights       = result.dimension_weights || {};
+        seqClips         = result.sequential_clips || [];
+        nonShorts        = result.non_sequential_shorts || [];
+
+        document.getElementById("loading").style.display = "none"
+        document.getElementById("error").style.display = "none"
+        document.getElementById("tabs-wrapper").hidden = false;
+        document.getElementById("count-seq").textContent = seqClips.length;
+        document.getElementById("count-non").textContent = nonShorts.length;
+
+        renderStats(result);
+        renderCategoryInfo(result);
+        renderSequential(seqClips,  document.getElementById("panel-seq"));
+        renderNonSequential(nonShorts, document.getElementById("panel-non"));
+
+        // Tab switching
+        document.querySelectorAll(".tab-btn").forEach(btn => {
+          btn.addEventListener("click", () => {
+            document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+            document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+            btn.classList.add("active");
+            document.getElementById(`panel-${btn.dataset.tab}`).classList.add("active");
+          });
+        });
+
+        // Sort
+        document.getElementById("sort-select").addEventListener("change", e => {
+          rerenderActive(e.target.value);
+        });
+
+      } catch (err) {
+        document.getElementById("loading").style.display = "none"
+        document.getElementById("error").style.display = "none"
+        document.getElementById("error-msg").textContent = err.message || String(err);
+        document.getElementById("banner").classList.add("show");
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

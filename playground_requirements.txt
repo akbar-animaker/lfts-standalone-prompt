@@ -1,0 +1,12 @@
+# Prompt Engineering Playground — dependencies
+# Install with: pip install -r playground_requirements.txt --break-system-packages
+
+# Web framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# Request body parsing (needed for FastAPI)
+python-multipart>=0.0.6
+
+# Already required by standalone.py:
+anthropic>=0.25.0

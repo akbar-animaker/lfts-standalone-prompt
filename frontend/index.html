@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prompt Engineering Playground</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script>var require = { paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } };</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+  <script>require(['vs/editor/editor.main'], function() { window.__monacoReady = true; window.dispatchEvent(new Event('monaco-ready')); });</script>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;background:#0f0f17;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif}
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-track{background:#1a1a2e}
+    ::-webkit-scrollbar-thumb{background:#3a3a5c;border-radius:3px}
+    ::-webkit-scrollbar-thumb:hover{background:#5a5a8c}
+    .monaco-wrap{border:1px solid #2d2d4e;border-radius:6px;overflow:hidden}
+    @keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.3}}
+    .pulse-dot{animation:pulse-dot 1.2s ease-in-out infinite}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+    .fade-in{animation:fadeIn .2s ease}
+    @keyframes slideIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
+    .slide-in{animation:slideIn .2s ease}
+    .tab-btn{transition:all .15s;border-bottom:2px solid transparent}
+    .tab-btn.active{border-bottom-color:#7c6af7;color:#a78bfa}
+    .tab-btn:not(.active):hover{color:#c4b5fd}
+    .stage-box{cursor:pointer;transition:filter .15s}
+    .stage-box:hover rect{filter:brightness(1.25)}
+    .stage-box.selected rect{stroke:#7c6af7!important;stroke-width:2!important}
+    .clip-card{transition:border-color .15s}
+    .clip-card:hover{border-color:#4a4a7c}
+  </style>
+  <script>tailwind.config={theme:{extend:{colors:{surface:'#1a1a2e',panel:'#16213e',border:'#2d2d4e',accent:'#7c6af7'}}}}</script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+// ── API ───────────────────────────────────────────────────────────────────────
+const api = {
+  get:  p    => fetch(`/api${p}`).then(r=>r.json()),
+  put:  (p,d)=> fetch(`/api${p}`,{method:'PUT', headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(r=>r.json()),
+  post: (p,d)=> fetch(`/api${p}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(r=>r.json()),
+  del:  p    => fetch(`/api${p}`,{method:'DELETE'}).then(r=>r.json()),
+};
+
+// ── Monaco Editor ─────────────────────────────────────────────────────────────
+function MonacoEditor({ value, onChange, language='plaintext', readOnly=false, height='100%' }) {
+  const ref=useRef(null), edRef=useRef(null), valRef=useRef(value);
+  useEffect(()=>{valRef.current=value;},[value]);
+  useEffect(()=>{
+    const init=()=>{
+      if(!ref.current||edRef.current)return;
+      const ed=window.monaco.editor.create(ref.current,{
+        value:valRef.current||'',language,theme:'vs-dark',automaticLayout:true,
+        minimap:{enabled:false},wordWrap:'on',fontSize:13,lineHeight:20,
+        scrollBeyondLastLine:false,readOnly,padding:{top:8},
+        fontFamily:"'JetBrains Mono','Fira Code',Consolas,monospace",
+      });
+      ed.onDidChangeModelContent(()=>{ if(onChange)onChange(ed.getValue()); });
+      edRef.current=ed;
+    };
+    if(window.__monacoReady)init();
+    else window.addEventListener('monaco-ready',init,{once:true});
+    return()=>{ if(edRef.current){edRef.current.dispose();edRef.current=null;} };
+  },[]);
+  useEffect(()=>{
+    if(edRef.current&&value!==edRef.current.getValue())edRef.current.setValue(value||'');
+  },[value]);
+  return <div ref={ref} style={{height,width:'100%'}} />;
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function Toast({msg,type,onClose}){
+  useEffect(()=>{const t=setTimeout(onClose,3500);return()=>clearTimeout(t);},[]);
+  const c={success:'bg-green-900 border-green-700',error:'bg-red-900 border-red-700',info:'bg-indigo-900 border-indigo-700'};
+  return(
+    <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg border text-sm fade-in shadow-xl ${c[type]||c.info}`}>
+      {msg}<button onClick={onClose} className="ml-3 opacity-60 hover:opacity-100">✕</button>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ARCHITECTURE TAB
+// ─────────────────────────────────────────────────────────────────────────────
+
+const STAGE_DETAILS = {
+  input:{
+    icon:'📂',title:'Input Files',step:'Start',color:'#334155',
+    tagline:'Where your content enters the system',
+    nontech:`You provide two files to the system:\n\n1. A transcript file (transcript.json) — this is the text of what was said in the video, produced by AWS Transcribe. It includes every word with exact timestamps down to the millisecond.\n\n2. A video file (input.mp4) — optional. If provided, the system extracts frames every 30 seconds so the AI can visually identify interview formats, speaker changes, or whether someone is presenting to a screen.\n\nEverything the AI does downstream is based entirely on what's in these two files.`,
+    inputs:['transcript.json — AWS Transcribe format with word-level timestamps','input.mp4 — video file (optional, enables visual context)'],
+    outputs:['Raw transcript data → Stage 1','Video frames (if provided) → passed to Agent #1'],
+    params:[{k:'TRANSCRIPT_PATH',v:'Path to transcript.json'},{k:'VIDEO_PATH',v:'Path to video file'},{k:'CLIP_MODE',v:'both | sequential | non_sequential'}],
+  },
+  s0:{
+    icon:'🏷️',title:'Stage 0 — Category Detection',step:'Stage 0',color:'#1e3a5f',
+    tagline:'Understands what kind of video this is, then sets the scoring rules',
+    nontech:"Before picking a single clip, the AI reads the first part of your transcript and asks: What kind of video is this?\n\nA comedy show clip needs a strong punchline. A business interview clip needs a clear, shareable insight. A product demo clip needs a strong hook and clear explanation.\n\nOnce it identifies the category, it assigns different importance weights to the 6 scoring dimensions — so clips are judged by the right standard for their audience, not a one-size-fits-all rule.\n\nFor example: a podcast gets high weight on 'Hook Strength'. A tutorial gets high weight on 'Standalone Clarity'. A motivational talk gets high weight on 'Emotional Resonance'.",
+    inputs:['First 3,000 characters of the merged transcript'],
+    outputs:['Video category name (e.g. "podcast_interview", "sales_demo")','6 scoring weights — integers that must sum to 100','Per-dimension reasoning explaining why each weight was chosen'],
+    params:[{k:'CLAUDE_MODEL',v:'LLM used'},{k:'CLAUDE_MAX_TOKENS',v:'Max response tokens'}],
+  },
+  s1:{
+    icon:'⚙️',title:'Stage 1 — Preprocess',step:'Stage 1',color:'#1e3a5f',
+    tagline:'Turns a wall of words into clean, timestamped sentences',
+    nontech:`AWS Transcribe gives you thousands of individual words — each with a start and end time. This stage groups them into proper sentences by splitting on punctuation marks (. ? !) and records the exact time each sentence starts and ends in the video.\n\nFor example:\n"Hello" at 0.2s + "my" at 0.4s + "name" at 0.6s + "is" at 0.8s + "Sarah." at 1.0s\n→ becomes one Sentence: "Hello my name is Sarah." starting at 0.2s, ending at 1.0s\n\nIt also detects the language of the video (English, Hindi, Spanish, etc.) which is used later for generating titles in the right language.`,
+    inputs:['Raw AWS Transcribe items array (words + punctuation with timestamps)'],
+    outputs:['Clean list of sentences — each with: index number, start time, end time, text','Total video duration in seconds','Language code (e.g. en-US, hi-IN)'],
+    params:[],
+  },
+  s1b:{
+    icon:'🎙️',title:'Stage 1b — Speaker Detection',step:'Stage 1b',color:'#2d3a5f',
+    tagline:'Figures out who is speaking each sentence — the most important boundary',
+    nontech:"AWS Transcribe often gives you a single stream of text with no speaker labels. But your video might have:\n• An interviewer asking questions + a guest answering\n• A main presenter + an embedded product demo video\n• A role-play between a customer and an advisor\n\nThis stage reads the full transcript and identifies every distinct voice. It then assigns each sentence to the correct speaker.\n\nWhy this matters: clips are NEVER allowed to cross a speaker boundary. A clip cannot mix the interviewer's question with the guest's answer from a different topic. Think of it as drawing invisible dividing lines in the transcript wherever the speaker changes.",
+    inputs:['All sentences with timestamps and gap markers between them'],
+    outputs:['Speaker list — each with name, role, and the sentence indices they speak','speakers.json file written to disk for verification','Boundary map used to constrain clip windows in Stage 2'],
+    params:[{k:'SECTION_BREAK_GAP_THRESHOLD',v:'Silence gap (seconds) that signals a new speaker section'}],
+  },
+  s2:{
+    icon:'✂️',title:'Stage 2 — Segmentation',step:'Stage 2',color:'#2d3a5f',
+    tagline:'Creates every possible clip candidate, never crossing speaker boundaries',
+    nontech:"Imagine going through the transcript and highlighting every possible clip — every combination of consecutive sentences that's long enough to be worth watching and short enough for social media.\n\nThis stage does that automatically — but with one iron rule: no clip may cross a speaker boundary. A clip is either 100% from the main presenter, or 100% from the embedded video, or 100% from the demo — never a mixture.\n\nThe result is a long list of 'candidate windows' — each one is a slice of the video with known start time, end time, and full text.",
+    inputs:['Sentence list','Speaker boundary map from Stage 1b'],
+    outputs:['Candidate windows — each with: ID, start time, end time, duration, full text, speaker label'],
+    params:[{k:'SEQUENTIAL_MIN_DURATION',v:'Minimum clip length in seconds'},{k:'SOCIAL_MEDIA_MAX_DURATION',v:'Maximum clip length (YouTube Shorts ceiling = 180s)'}],
+  },
+  a1:{
+    icon:'🤖',title:'Agent #1 — Sequential Selection',step:'Step 3a',color:'#3b2d5f',
+    tagline:'Picks the best uninterrupted single-window clips',
+    nontech:"This is the first AI agent doing creative work. It reads every candidate clip window and selects the ones most likely to perform well on social media.\n\nIt acts like a professional video editor who asks: Does this clip have a strong hook in the first 3 seconds? Does it deliver a clear insight? Can someone who has never seen the full video understand it completely? Does it end satisfyingly?\n\nOnly clips that score 75/100 or above are selected. The number of clips is scaled to the video length (roughly 1 clip per 10 minutes of video).",
+    inputs:['All candidate windows with text, duration, speaker labels','Dynamic scoring framework from Stage 0'],
+    outputs:['Selected window IDs with reasons why each was chosen'],
+    params:[{k:'TARGET_SCORE',v:'Minimum score to pass (75/100 threshold)'},{k:'SOCIAL_MEDIA_MAX_DURATION',v:'Hard ceiling for clip length'}],
+  },
+  a3:{
+    icon:'🔧',title:'Agent #3 — Sequential Refinement',step:'Step 3a',color:'#3b2d5f',
+    tagline:'Fine-tunes clip boundaries to fix weak hooks or abrupt endings',
+    nontech:"After Agent #1 selects a clip, this agent asks: can we improve it by starting a few seconds earlier or ending a few seconds later?\n\nFor example: if a clip opens mid-sentence with '...and that's why we changed everything', the agent searches nearby windows to find one that starts with a complete, attention-grabbing opener instead — like 'Three years ago we nearly went bankrupt — and that's why we changed everything.'\n\nCrucial rule: it NEVER switches to a different topic. It only adjusts the start/end boundaries of the same clip.",
+    inputs:['Selected clip + neighboring windows within ±35 seconds','Score and per-dimension reasoning from the Scorer'],
+    outputs:['Refined clip with adjusted start/end time + improved score breakdown'],
+    params:[{k:'MAX_ITERATIONS_PER_SHORT',v:'Max refinement rounds per clip'},{k:'REFINE_PAD',v:'Seconds of context exposed on each side for boundary options'}],
+  },
+  a2:{
+    icon:'🤖',title:'Agent #2 — Non-Sequential Selection',step:'Step 3b',color:'#1f3b3b',
+    tagline:'Stitches together the best moments from anywhere in the video',
+    nontech:"Some of the most powerful social media clips aren't one continuous moment — they're the best 30 seconds from different parts of an hour-long video, stitched together into one coherent story.\n\nThis agent reads all individual sentences from across the ENTIRE video and picks combinations that tell one complete, compelling story — even if the sentences are 20 minutes apart in the original recording.\n\nFor example: the setup from minute 5, the key insight from minute 32, and the powerful closing line from minute 58 could become one 45-second clip that makes perfect sense.",
+    inputs:['All individual sentences from the complete transcript','Dynamic scoring framework from Stage 0'],
+    outputs:['Multi-segment shorts — each with: list of sentence IDs from anywhere in the video, total duration, reason'],
+    params:[{k:'NON_SEQUENTIAL_MIN_DURATION',v:'Min total duration'},{k:'NON_SEQUENTIAL_MAX_DURATION',v:'Max total duration'}],
+  },
+  a4:{
+    icon:'🔧',title:'Agent #4 — Non-Sequential Refinement',step:'Step 3b',color:'#1f3b3b',
+    tagline:'Improves assembled clips by swapping, adding or removing sentences',
+    nontech:"Like Agent #3 refines single-window clips, this agent refines multi-segment shorts.\n\nIt might: swap the opening sentence for one with a stronger hook, drop a trailing sentence that weakens the ending, or add a sentence that provides missing context.\n\nOne safety rule: it can only draw from sentences within 60 seconds of the short's existing span — this prevents the AI from grafting in completely unrelated content from elsewhere in the video.",
+    inputs:["Current short's sentence IDs + full sentence list","Score and weakest-factor analysis from the Scorer"],
+    outputs:['Refined short with updated sentence selection + improved score'],
+    params:[{k:'REFINE_NONSEQ_PAD',v:'Maximum seconds away from current span for replacement sentences'}],
+  },
+  scorer:{
+    icon:'⭐',title:'Scorer (used by Agents #3 and #4)',step:'Inside #3/#4',color:'#2d1f4a',
+    tagline:'Gives every clip a 0–100 score across 6 dimensions',
+    nontech:"Before refinement can happen, each clip needs a quality score. The scorer evaluates every clip on exactly 6 dimensions:\n\n1. Hook Strength — does the first sentence immediately grab attention?\n2. Reframe / Insight — does it make you think differently about something?\n3. Emotional Resonance — does it make you feel something?\n4. Standalone Clarity — can someone who never saw the full video understand it completely?\n5. Quotability — is there a line you'd want to share or remember?\n6. Clean Ending — does it end at a satisfying, resolved moment?\n\nThe weights for each dimension were set in Stage 0 based on the video category.",
+    inputs:['Clip text preview (first 100 words)','Video category + dynamic weights from Stage 0'],
+    outputs:['Score 0–100 (weighted sum)','Per-dimension scores','Weakest factor name','Specific improvement advice'],
+    params:[{k:'TARGET_SCORE',v:'Score at which refinement stops (90/100 target)'},{k:'SCORE_MARKET_ADJUSTMENT',v:'Global score adjustment applied to all dimensions'}],
+  },
+  a5:{
+    icon:'📋',title:'Agent #5 — Final Metadata',step:'Stage 4',color:'#3b2d1f',
+    tagline:'Writes a title for each clip and recommends which platforms to post on',
+    nontech:"Once all clips are selected and scored, this agent writes a punchy 6–8 word title for each one.\n\nImportant: titles are written in the video's original language. If your video is in Hindi, titles come out in Hindi. If it's in Tamil, titles come out in Tamil.\n\nIt also recommends which platforms each clip should go on, based on duration:\n• Under 90 seconds → TikTok, Instagram Reels, YouTube Shorts, LinkedIn\n• 90–180 seconds → YouTube Shorts and LinkedIn only (TikTok/Instagram cap at 90s)",
+    inputs:['All clips with type, duration, score, category, text preview','Detected language code from Stage 1'],
+    outputs:['Title per clip (in native language)','Platforms array per clip'],
+    params:[{k:'SOCIAL_MEDIA_MAX_DURATION',v:'Determines platform eligibility cutoffs'}],
+  },
+  rank:{
+    icon:'📊',title:'Stage 5 — Ranking',step:'Stage 5',color:'#1e3a1e',
+    tagline:'Sorts everything into a logical order for the human editor',
+    nontech:"Simple but important: sequential clips are sorted by their position in the video (earliest clip first), making it easy to scan through the video in order. Non-sequential shorts are sorted by quality score (best clip first), so the editor sees the strongest content immediately.",
+    inputs:['All clips from both sequential and non-sequential pipelines'],
+    outputs:['Ordered sequential_clips (by video position)','Ordered non_sequential_shorts (by confidence score)'],
+    params:[],
+  },
+  output:{
+    icon:'📄',title:'Output Files',step:'Done',color:'#1a3322',
+    tagline:'Final deliverable — a JSON file with every clip ready to cut',
+    nontech:"The pipeline writes two files:\n\nresult.json — contains every selected clip with:\n• Title (in the video's language)\n• Exact start and end time in the video\n• Quality score and per-dimension breakdown\n• Which platforms to post on\n• The reason it was selected\n• Iteration history (how many refinements were needed)\n\nspeakers.json — shows which parts of the video belong to which speaker, with time ranges and transcripts. Useful for verifying the speaker boundary detection.",
+    inputs:['Ranked clips from both pipelines','Token usage summary'],
+    outputs:['result.json (sequential_clips + non_sequential_shorts + metadata)','speakers.json (per-speaker segments and transcripts)'],
+    params:[{k:'OUTPUT_PATH',v:'Where result.json is written'},{k:'SPEAKERS_OUTPUT_PATH',v:'Where speakers.json is written'}],
+  },
+};
+
+function ArchitectureTab() {
+  const [sel, setSel] = useState(null);
+
+  const stages = [
+    {id:'input', color:'#334155'},{id:'s0', color:'#1e3a5f'},{id:'s1', color:'#1e3a5f'},
+    {id:'s1b',  color:'#2d3a5f'},{id:'s2', color:'#2d3a5f'},
+    {id:'a1',   color:'#3b2d5f'},{id:'a3', color:'#3b2d5f'},
+    {id:'a2',   color:'#1f3b3b'},{id:'a4', color:'#1f3b3b'},
+    {id:'scorer',color:'#2d1f4a'},
+    {id:'a5',   color:'#3b2d1f'},{id:'rank',color:'#1e3a1e'},{id:'output',color:'#1a3322'},
+  ];
+
+  const grid = [
+    // [id, col, row]
+    ['input',0,0],['s0',1,0],['s1',2,0],['s1b',3,0],['s2',4,0],
+    ['a1',1,1],['a3',2,1],['a2',3,1],['a4',4,1],
+    ['scorer',0,2],['a5',1,2],['rank',2,2],['output',3,2],
+  ];
+
+  const W=128,H=72,GX=22,GY=18,PX=18,PY=16;
+  const svgW = PX*2 + 5*(W+GX);
+  const svgH = PY*2 + 3*(H+GY);
+
+  const pos = (col,row) => ({ x: PX+col*(W+GX), y: PY+row*(H+GY) });
+  const pmap = {};
+  grid.forEach(([id,col,row])=>{ pmap[id]=pos(col,row); });
+
+  const arrows = [
+    ['input','s0'],['s0','s1'],['s1','s1b'],['s1b','s2'],
+    ['s2','a1'],['a1','a3'],
+    ['s2','a2'],['a2','a4'],
+    ['a3','a5'],['a4','a5'],
+    ['scorer','a3'],['scorer','a4'],
+    ['a5','rank'],['rank','output'],
+  ];
+
+  const det = sel ? STAGE_DETAILS[sel] : null;
+
+  return (
+    <div className="flex h-full fade-in" style={{minHeight:'600px'}}>
+      {/* Diagram */}
+      <div className={`flex-1 p-6 overflow-auto transition-all ${sel?'pr-2':''}`}>
+        <h2 className="text-lg font-semibold text-gray-200 mb-1">Pipeline Architecture</h2>
+        <p className="text-sm text-gray-400 mb-4">
+          Click any stage for a plain-English explanation of what it does.
+        </p>
+        <svg width={svgW} height={svgH} xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="ah" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+              <polygon points="0 0,8 3,0 6" fill="#4b5563"/>
+            </marker>
+          </defs>
+          {arrows.map(([f,t])=>{
+            const a=pmap[f],b=pmap[t]; if(!a||!b)return null;
+            const ax=a.x+W, ay=a.y+H/2, bx=b.x, by=b.y+H/2;
+            if(Math.abs(ay-by)<4)
+              return <line key={`${f}-${t}`} x1={ax} y1={ay} x2={bx-2} y2={by} stroke="#4b5563" strokeWidth="1.5" markerEnd="url(#ah)"/>;
+            const mx=(ax+bx)/2;
+            return <path key={`${f}-${t}`} d={`M${ax},${ay} C${mx},${ay} ${mx},${by} ${bx-2},${by}`} fill="none" stroke="#4b5563" strokeWidth="1.5" markerEnd="url(#ah)"/>;
+          })}
+          {grid.map(([id,col,row])=>{
+            const d=STAGE_DETAILS[id]; if(!d)return null;
+            const {x,y}=pos(col,row);
+            const isSel=sel===id;
+            return(
+              <g key={id} className={`stage-box${isSel?' selected':''}`} onClick={()=>setSel(sel===id?null:id)}>
+                <rect x={x} y={y} width={W} height={H} rx="8"
+                  fill={d.color} stroke={isSel?'#7c6af7':'#4b5563'} strokeWidth={isSel?2:1}/>
+                {isSel&&<rect x={x-1} y={y-1} width={W+2} height={H+2} rx="9" fill="none" stroke="#7c6af7" strokeWidth="1" opacity=".4"/>}
+                <text x={x+W/2} y={y+18} textAnchor="middle" fontSize="18">{d.icon}</text>
+                <text x={x+W/2} y={y+36} textAnchor="middle" fill="#e2e8f0" fontSize="10.5" fontWeight="600">{d.title.split('—')[0].replace(/Stage \w+ /,'').trim().substring(0,18)}</text>
+                <text x={x+W/2} y={y+50} textAnchor="middle" fill="#94a3b8" fontSize="8.5">{d.step}</text>
+                <text x={x+W/2} y={y+62} textAnchor="middle" fill="#64748b" fontSize="7.5">click for details</text>
+              </g>
+            );
+          })}
+        </svg>
+
+        {/* Legend */}
+        <div className="mt-6 flex flex-wrap gap-3">
+          {[
+            {color:'#1e3a5f',label:'Core pipeline'},
+            {color:'#3b2d5f',label:'Sequential agents'},
+            {color:'#1f3b3b',label:'Non-sequential agents'},
+            {color:'#2d1f4a',label:'Scorer'},
+            {color:'#3b2d1f',label:'Metadata + Ranking'},
+          ].map(i=>(
+            <div key={i.label} className="flex items-center gap-1.5 text-xs text-gray-400">
+              <div className="w-3 h-3 rounded" style={{background:i.color,border:'1px solid #4b5563'}}/>
+              {i.label}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Detail panel */}
+      {det && (
+        <div className="w-96 flex-shrink-0 border-l border-border bg-surface overflow-y-auto slide-in">
+          <div className="sticky top-0 bg-surface border-b border-border px-4 py-3 flex items-start justify-between gap-2 z-10">
+            <div className="flex items-start gap-2">
+              <span className="text-2xl">{det.icon}</span>
+              <div>
+                <div className="text-sm font-bold text-gray-100 leading-snug">{det.title}</div>
+                <div className="text-xs text-violet-400 mt-0.5">{det.tagline}</div>
+              </div>
+            </div>
+            <button onClick={()=>setSel(null)} className="text-gray-500 hover:text-gray-300 flex-shrink-0 text-lg mt-0.5">✕</button>
+          </div>
+          <div className="p-4 space-y-4 text-sm">
+            {/* Plain English */}
+            <div>
+              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">What it does</div>
+              <div className="text-gray-300 text-xs leading-5 whitespace-pre-line bg-gray-900/50 rounded-lg p-3 border border-border">
+                {det.nontech}
+              </div>
+            </div>
+            {/* Input / Output */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">📥 Input</div>
+                <ul className="space-y-1">
+                  {det.inputs.map((i,idx)=>(<li key={idx} className="text-xs text-gray-300 flex gap-1"><span className="text-gray-600 flex-shrink-0">•</span>{i}</li>))}
+                </ul>
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">📤 Output</div>
+                <ul className="space-y-1">
+                  {det.outputs.map((o,idx)=>(<li key={idx} className="text-xs text-green-300 flex gap-1"><span className="text-gray-600 flex-shrink-0">•</span>{o}</li>))}
+                </ul>
+              </div>
+            </div>
+            {/* Config params */}
+            {det.params && det.params.length > 0 && (
+              <div>
+                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">⚙️ Key Config</div>
+                <div className="space-y-1.5">
+                  {det.params.map(p=>(
+                    <div key={p.k} className="flex gap-2 text-xs">
+                      <code className="text-violet-300 font-mono flex-shrink-0">{p.k}</code>
+                      <span className="text-gray-400">{p.v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROMPTS TAB — ordered to match pipeline flow
+// ─────────────────────────────────────────────────────────────────────────────
+const PROMPT_LABELS = {
+  CATEGORY_DETECTION_PROMPT: { label:'Category Detector',         icon:'🏷️', step:'Stage 0',  desc:'Identifies video type + sets dynamic scoring weights' },
+  SPEAKER_DETECTION_PROMPT:  { label:'Speaker Detector',          icon:'🎙️', step:'Stage 1b', desc:'Assigns every sentence to a speaker' },
+  SEQUENCE_PROMPT:           { label:'Sequential Selection',      icon:'🎯', step:'Agent #1', desc:'Picks the best single-window clips' },
+  REFINE_PROMPT:             { label:'Sequential Refinement',     icon:'🔧', step:'Agent #3', desc:'Adjusts clip start/end boundaries' },
+  NONSEQUENCE_PROMPT:        { label:'Non-Sequential Selection',  icon:'🎬', step:'Agent #2', desc:'Assembles clips from scattered sentences' },
+  REFINE_NONSEQ_PROMPT:      { label:'Non-Sequential Refinement', icon:'🔧', step:'Agent #4', desc:'Improves sentence selection' },
+  SCORER_PROMPT:             { label:'Clip Scorer',               icon:'⭐', step:'Scorer',   desc:'Scores clips on 6 dimensions (0–100)' },
+  METADATA_PROMPT:           { label:'Metadata Generator',        icon:'📋', step:'Agent #5', desc:'Generates titles + platform recommendations' },
+};
+
+function PromptsTab({ prompts, onSave, onReset }) {
+  const [selected,setSelected] = useState('CATEGORY_DETECTION_PROMPT');
+  const [draft,setDraft] = useState({});
+  const [saving,setSaving] = useState(false);
+
+  useEffect(()=>{ setDraft(p=>({...p,[selected]:prompts[selected]??''})); },[selected,prompts]);
+
+  const isDirty = draft[selected]!==undefined && draft[selected]!==prompts[selected];
+
+  const handleSave = async()=>{ setSaving(true); try{await onSave({[selected]:draft[selected]});}finally{setSaving(false);} };
+  const handleReset = async()=>{
+    if(!confirm(`Reset "${PROMPT_LABELS[selected]?.label}" to its default?`))return;
+    const val=await onReset(selected);
+    setDraft(p=>({...p,[selected]:val}));
+  };
+
+  return(
+    <div className="flex fade-in" style={{height:'calc(100vh - 112px)'}}>
+      {/* Sidebar */}
+      <div className="w-60 flex-shrink-0 border-r border-border overflow-y-auto">
+        <div className="px-3 py-2 border-b border-border text-xs text-gray-500 font-medium uppercase tracking-wide">Pipeline Order</div>
+        {Object.entries(PROMPT_LABELS).map(([key,meta])=>(
+          <button key={key} onClick={()=>setSelected(key)}
+            className={`w-full text-left px-3 py-2.5 border-b border-border/50 transition-all ${selected===key?'bg-indigo-900/40 border-l-2 border-l-accent':'hover:bg-surface'}`}>
+            <div className="flex items-center gap-2">
+              <span className="text-base">{meta.icon}</span>
+              <div className="min-w-0">
+                <div className={`text-xs font-semibold ${selected===key?'text-violet-300':'text-gray-300'}`}>{meta.label}</div>
+                <div className="text-xs text-gray-500 mt-0.5">{meta.step} · {meta.desc}</div>
+              </div>
+            </div>
+            {draft[key]!==undefined&&draft[key]!==prompts[key]&&(
+              <div className="text-xs text-amber-400 mt-1 pl-6">● unsaved</div>
+            )}
+          </button>
+        ))}
+      </div>
+      {/* Editor */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-surface">
+          <div>
+            <span className="text-sm font-semibold text-gray-200">{PROMPT_LABELS[selected]?.label}</span>
+            <span className="ml-2 text-xs text-gray-500 font-mono">{selected}</span>
+            {isDirty&&<span className="ml-2 text-xs text-amber-400">● unsaved</span>}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={handleReset}
+              className="px-3 py-1.5 text-xs rounded bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors">
+              Reset to Default
+            </button>
+            <button onClick={handleSave} disabled={!isDirty||saving}
+              className={`px-4 py-1.5 text-xs rounded font-medium transition-colors ${isDirty&&!saving?'bg-accent hover:bg-violet-600 text-white':'bg-gray-700 text-gray-500 cursor-not-allowed'}`}>
+              {saving?'Saving…':'Save Prompt'}
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 monaco-wrap" style={{borderRadius:0,border:'none'}}>
+          <MonacoEditor key={selected} value={draft[selected]??prompts[selected]??''} onChange={v=>setDraft(p=>({...p,[selected]:v}))} language="markdown"/>
+        </div>
+        <div className="px-4 py-2 border-t border-border bg-surface text-xs text-gray-500 flex justify-between">
+          <span>Variables like <code className="text-violet-300">{'{video_category}'}</code> are filled at runtime by the pipeline.</span>
+          <span>{(draft[selected]??prompts[selected]??'').length} chars</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONFIG TAB
+// ─────────────────────────────────────────────────────────────────────────────
+function ConfigTab({ config, schema, onSave, onReset }) {
+  const [draft,setDraft]=useState({});
+  const [saving,setSaving]=useState(false);
+  useEffect(()=>{setDraft({...config});},[config]);
+
+  const groups={};
+  Object.entries(schema).forEach(([key,meta])=>{
+    if(!groups[meta.group])groups[meta.group]=[];
+    groups[meta.group].push({key,...meta});
+  });
+  const isDirty=Object.keys(draft).some(k=>String(draft[k])!==String(config[k]));
+  const handleSave=async()=>{setSaving(true);try{await onSave(draft);}finally{setSaving(false);}};
+  const gi={'Model':'🤖','Pipeline':'⚙️','Scoring':'⭐','Refinement':'🔧','Video':'🎬','Files':'📂'};
+  debugger;
+  return(
+    <div className="p-6 fade-in max-w-3xl">
+      <div className="flex items-center justify-between mb-6">
+        <div><h2 className="text-lg font-semibold text-gray-200">Pipeline Configuration</h2>
+          <p className="text-sm text-gray-400 mt-0.5">Changes apply to the next run.</p></div>
+        <div className="flex gap-2">
+          <button onClick={()=>{if(confirm('Reset all config to defaults?'))onReset();}}
+            className="px-3 py-1.5 text-sm rounded bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors">Reset All</button>
+          <button onClick={handleSave} disabled={!isDirty||saving}
+            className={`px-4 py-1.5 text-sm rounded font-medium transition-colors ${isDirty&&!saving?'bg-accent hover:bg-violet-600 text-white':'bg-gray-700 text-gray-500 cursor-not-allowed'}`}>
+            {saving?'Saving…':'Save Config'}
+          </button>
+        </div>
+      </div>
+      {Object.entries(groups).filter(a => a[0] !== 'Refinement').map(([group,fields])=>(
+        <div key={group} className="mb-5 rounded-lg border border-border overflow-hidden">
+          <div className="px-4 py-2 bg-surface border-b border-border flex items-center gap-2">
+            <span>{gi[group]||'⚙️'}</span><span className="text-sm font-semibold text-gray-300">{group}</span>
+          </div>
+          <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {fields.filter(a => a.key !== 'SCORE_MARKET_ADJUSTMENT').map(({key,label,type})=>(
+              <div key={key}>
+                <label className="block text-xs font-medium text-gray-400 mb-1">
+                  {label}{String(draft[key])!==String(config[key])&&<span className="ml-1 text-amber-400">●</span>}
+                </label>
+                {key==='CLAUDE_API_KEY'?(
+                  <input type="password" className="w-full bg-gray-900 border border-border rounded px-3 py-1.5 text-sm font-mono text-gray-200 outline-none focus:border-accent"
+                    value={draft[key]||''} onChange={e=>setDraft(d=>({...d,[key]:e.target.value}))} placeholder="sk-ant-..."/>
+                ):key==='CLIP_MODE'?(
+                  <select className="w-full bg-gray-900 border border-border rounded px-3 py-1.5 text-sm text-gray-200 outline-none focus:border-accent"
+                    value={draft[key]||'both'} onChange={e=>setDraft(d=>({...d,[key]:e.target.value}))}>
+                    <option value="both">both</option>
+                    <option value="sequential">sequential only</option>
+                    <option value="non_sequential">non_sequential only</option>
+                  </select>
+                ):(
+                  <input type={type==='int'||type==='float'?'number':'text'} step={type==='float'?'0.1':'1'}
+                    className="w-full bg-gray-900 border border-border rounded px-3 py-1.5 text-sm font-mono text-gray-200 outline-none focus:border-accent"
+                    value={draft[key]??''} onChange={e=>setDraft(d=>({...d,[key]:e.target.value}))}/>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LOGS TAB
+// ─────────────────────────────────────────────────────────────────────────────
+function LogsTab({ run, onStartRun, status }) {
+  const endRef=useRef(null);
+  const [clipMode,setClipMode]=useState('both');
+  const [saveVer,setSaveVer]=useState(false);
+  useEffect(()=>{ if(endRef.current)endRef.current.scrollIntoView({behavior:'smooth'}); },[run?.logs]);
+  const lc={INFO:'text-slate-300',WARNING:'text-amber-400',ERROR:'text-red-400',DEBUG:'text-slate-500'};
+  const sc={'PREPROCESS':'text-cyan-400','SEGMENT':'text-sky-400','SPEAKERS':'text-blue-400',
+    'CATEGORY':'text-purple-400','SEQ':'text-violet-400','NONSEQ':'text-indigo-400',
+    'META':'text-pink-400','RANK':'text-rose-400','AGENT':'text-emerald-400','LLM':'text-yellow-500',
+    'DONE':'text-green-400','PIPELINE':'text-teal-400','ERROR':'text-red-400','FRAMES':'text-orange-400'};
+  const colorLine=m=>{ const x=m?.match(/\[([A-Z_0-9]+)\]/); return x&&sc[x[1]]?sc[x[1]]:null; };
+  return(
+    <div className="flex flex-col fade-in" style={{height:'calc(100vh - 112px)'}}>
+      <div className="flex items-center gap-4 px-6 py-3 border-b border-border bg-surface flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-400">Mode:</label>
+          <select className="bg-gray-900 border border-border rounded px-2 py-1 text-sm text-gray-200 outline-none"
+            value={clipMode} onChange={e=>setClipMode(e.target.value)} disabled={run?.status==='running'}>
+            <option value="both">Both</option>
+            <option value="sequential">Sequential only</option>
+            <option value="non_sequential">Non-Sequential only</option>
+          </select>
+        </div>
+        <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer">
+          <input type="checkbox" checked={saveVer} onChange={e=>setSaveVer(e.target.checked)} className="accent-violet-500"/>
+          Auto-save version before run
+        </label>
+        <div className="ml-auto flex items-center gap-3">
+          {run?.status==='running'&&<span className="flex items-center gap-1.5 text-sm text-yellow-400"><span className="pulse-dot w-2 h-2 rounded-full bg-yellow-400 inline-block"></span>Running…</span>}
+          {run?.status==='success'&&<span className="text-sm text-green-400">✓ Completed</span>}
+          {run?.status==='error'&&<span className="text-sm text-red-400">✗ Failed</span>}
+          <button onClick={()=>onStartRun(clipMode,saveVer)} disabled={run?.status==='running'||!status?.transcript_exists}
+            className={`flex items-center gap-2 px-5 py-2 rounded-lg font-semibold text-sm transition-all ${run?.status==='running'||!status?.transcript_exists?'bg-gray-700 text-gray-500 cursor-not-allowed':'bg-accent hover:bg-violet-600 text-white shadow-lg shadow-violet-900/30'}`}>
+            <span>▶</span>{run?.status==='running'?'Running…':'Run Pipeline'}
+          </button>
+        </div>
+      </div>
+      {!status?.transcript_exists&&(
+        <div className="mx-6 mt-3 p-3 rounded bg-red-900/30 border border-red-800 text-sm text-red-300">
+          ⚠ Transcript not found: <code className="font-mono ml-1">{status?.transcript_path}</code> — update path in Config tab.
+        </div>
+      )}
+      <div className="flex-1 overflow-y-auto px-6 py-4 font-mono text-xs">
+        {(!run||run.logs?.length===0)&&(
+          <div className="text-gray-600 text-center py-16">Hit <strong className="text-gray-400">Run Pipeline</strong> to stream logs here.</div>
+        )}
+        {run?.logs?.map((e,i)=>(
+          <div key={i} className={`leading-5 ${colorLine(e.message)||lc[e.level]||'text-slate-400'}`}>{e.message}</div>
+        ))}
+        <div ref={endRef}/>
+      </div>
+      {run&&(
+        <div className="px-6 py-2 border-t border-border bg-surface text-xs text-gray-500 flex justify-between flex-shrink-0">
+          <span>Run: <code className="text-gray-400">{run.id}</code></span>
+          <span>{run.logs?.length||0} lines</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VIDEO PLAYER
+// ─────────────────────────────────────────────────────────────────────────────
+function VideoPlayer({ clip, onClose }) {
+  const videoRef=useRef(null);
+  const [ready,setReady]=useState(false);
+  const clipRef=useRef(clip);
+  useEffect(()=>{ clipRef.current=clip; },[clip]);
+
+  // Seek + play whenever clip changes
+  useEffect(()=>{
+    if(!clip||!videoRef.current)return;
+    const seekPlay=()=>{
+      const st = clip.video_start_time ?? clip.start_time ?? 0;
+      videoRef.current.currentTime=st;
+      videoRef.current.play().catch(()=>{});
+    };
+    if(videoRef.current.readyState>=2) seekPlay();
+    else videoRef.current.addEventListener('loadeddata',seekPlay,{once:true});
+  },[clip]);
+
+  const endTime = clip?.video_end_time ?? clip?.end_time ?? Infinity;
+
+  const handleTimeUpdate=()=>{
+    if(!videoRef.current)return;
+    if(videoRef.current.currentTime>=endTime) videoRef.current.pause();
+  };
+
+  const jumpStart=()=>{
+    if(!videoRef.current||!clip)return;
+    const st=clip.video_start_time??clip.start_time??0;
+    videoRef.current.currentTime=st;
+    videoRef.current.play().catch(()=>{});
+  };
+
+  const startT=(clip?.video_start_time??clip?.start_time??0).toFixed(1);
+  const endT=(clip?.video_end_time??clip?.end_time??0).toFixed(1);
+  const dur=((clip?.video_end_time??clip?.end_time??0)-(clip?.video_start_time??clip?.start_time??0)).toFixed(1);
+
+  return(
+    <div className="fixed bottom-4 right-4 z-40 w-[380px] bg-[#12121f] border border-border rounded-xl shadow-2xl overflow-hidden fade-in">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-sm">🎬</span>
+          <span className="text-xs text-gray-200 truncate font-medium">{clip?.title||'Clip Preview'}</span>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className="text-xs text-gray-500 font-mono">{startT}s – {endT}s</span>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-base ml-1">✕</button>
+        </div>
+      </div>
+      <video ref={videoRef} src="/api/video" onTimeUpdate={handleTimeUpdate}
+        onLoadedData={()=>setReady(true)} controls
+        className="w-full block" style={{maxHeight:'210px',background:'#000'}}/>
+      <div className="flex items-center justify-between px-3 py-2 bg-surface">
+        <button onClick={jumpStart} className="text-xs text-violet-300 hover:text-violet-200 flex items-center gap-1">
+          ⟳ Jump to clip start ({startT}s)
+        </button>
+        <span className="text-xs text-gray-500">{dur}s clip</span>
+      </div>
+      {/* Non-seq segment info */}
+      {clip?.clips && clip.clips.length > 1 && (
+        <div className="px-3 pb-3">
+          <div className="text-xs text-gray-500 mb-1.5">Segments in this clip:</div>
+          <div className="flex flex-wrap gap-1" style={{whiteSpace:'nowrap', maxHeight: '100px', overflowY: 'scroll'}}>
+            {clip.clips.map((c,i)=>(
+              <button key={i} onClick={()=>{
+                if(videoRef.current){videoRef.current.currentTime=c.startTime??c.start_time??0;videoRef.current.play().catch(()=>{});}
+              }}
+                className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-0.5 rounded transition-colors">
+                {(c.startTime??c.start_time??0).toFixed(0)}s–{(c.endTime??c.end_time??0).toFixed(0)}s
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STAGE FLOW TABLE
+// ─────────────────────────────────────────────────────────────────────────────
+function StageFlowTable({ run }) {
+  const result = run?.result;
+  const logs   = run?.logs || [];
+
+  const seqClips = result?.sequential_clips || [];
+  const nonSeq   = result?.non_sequential_shorts || [];
+  const avgScore = arr => arr.length
+    ? Math.round(arr.reduce((s,c)=>s+(c.confidence_score||0),0)/arr.length) : 0;
+
+  const stageRows = useMemo(() => {
+    const msgs = logs.map(l=>l.message||'');
+    const seen  = p => msgs.some(m=>p.test(m));
+    const extract = (list, re) => { for(const m of list){ const x=m.match(re); if(x) return x[1]||x[2]||x[3]||x[0]; } return null; };
+
+    const hasCat  = seen(/\[CATEGORY\]/i);
+    const hasPre  = seen(/\[PREPROCESS\]/i);
+    const hasSpk  = seen(/\[SPEAKERS\]/i);
+    const hasSeg  = seen(/\[SEGMENT\]/i);
+    const hasSeq  = seen(/\[SEQ\]/i);
+    const hasSeqR = seen(/\[SEQ\].*refin/i);
+    const hasNS   = seen(/\[NONSEQ\]/i);
+    const hasNSR  = seen(/\[NONSEQ\].*refin/i);
+    const hasMeta = seen(/\[META\]/i);
+    const hasRank = seen(/\[RANK\]/i);
+
+    const sentN = extract(msgs, /(\d[\d,]*)\s+sentence/i);
+    const spkN  = extract(msgs, /(\d+)\s+unique\s+speaker|detected\s+(\d+)\s+speaker|(\d+)\s+speaker/i);
+    const candN = extract(msgs, /(\d[\d,]*)\s+candidate/i);
+
+    const isDone = run?.status==='success';
+    const isRun  = run?.status==='running';
+    const st = (condDone, condSeen) => condDone?'done': condSeen?'seen': isRun?'pending':'idle';
+
+    return [
+      {
+        stage:'0', icon:'🏷️', name:'Category Detection',
+        status: st(!!result?.video_category, hasCat),
+        output: result?.video_category || null,
+        detail: result?.dimension_weights
+          ? Object.entries(result.dimension_weights).map(([k,v])=>`${k.replace(/_/g,' ')} ${v}%`).join(' · ')
+          : null,
+      },
+      {
+        stage:'1', icon:'⚙️', name:'Preprocess',
+        status: st(!!result?.video_duration, hasPre),
+        output: result?.video_duration
+          ? `${result.video_duration.toFixed(1)}s · ${result.language_code||'en'}`
+          : (sentN ? `${parseInt(sentN.replace(/,/g,'')).toLocaleString()} sentences` : (hasPre?'Completed':null)),
+        detail: sentN ? `${parseInt(sentN.replace(/,/g,'')).toLocaleString()} sentences detected` : null,
+      },
+      {
+        stage:'1b', icon:'🎙️', name:'Speaker Detection',
+        status: st(hasSpk||isDone, hasSpk),
+        output: spkN ? `${spkN} speaker(s) identified` : (hasSpk?'Completed':null),
+        detail: null,
+      },
+      {
+        stage:'2', icon:'✂️', name:'Segmentation',
+        status: st(hasSeg||isDone, hasSeg),
+        output: candN ? `${parseInt(candN.replace(/,/g,'')).toLocaleString()} candidate windows` : (hasSeg?'Completed':null),
+        detail: null,
+      },
+      {
+        stage:'3a', icon:'🤖', name:'Sequential Selection (Agent #1)',
+        status: st(result?.sequential_clips!=null, hasSeq),
+        output: result?.sequential_clips!=null
+          ? `${seqClips.length} clip${seqClips.length!==1?'s':''} selected`
+          : (hasSeq?'Running…':null),
+        detail: null,
+      },
+      {
+        stage:'3a', icon:'🔧', name:'Sequential Refinement (Agent #3)',
+        status: st(result?.sequential_clips!=null, hasSeqR),
+        output: result?.sequential_clips!=null
+          ? (seqClips.length>0
+              ? `${seqClips.length} clips · avg score ${avgScore(seqClips)}/100`
+              : '0 clips after refinement')
+          : (hasSeqR?'Running…':null),
+        detail: seqClips.length>0
+          ? `Scores: ${seqClips.map(c=>c.confidence_score).join(', ')}`
+          : null,
+      },
+      {
+        stage:'3b', icon:'🤖', name:'Non-Seq Selection (Agent #2)',
+        status: st(result?.non_sequential_shorts!=null, hasNS),
+        output: result?.non_sequential_shorts!=null
+          ? `${nonSeq.length} short${nonSeq.length!==1?'s':''} selected`
+          : (hasNS?'Running…':null),
+        detail: null,
+      },
+      {
+        stage:'3b', icon:'🔧', name:'Non-Seq Refinement (Agent #4)',
+        status: st(result?.non_sequential_shorts!=null, hasNSR),
+        output: result?.non_sequential_shorts!=null
+          ? (nonSeq.length>0
+              ? `${nonSeq.length} shorts · avg score ${avgScore(nonSeq)}/100`
+              : '0 shorts after refinement')
+          : (hasNSR?'Running…':null),
+        detail: nonSeq.length>0
+          ? `Scores: ${nonSeq.map(c=>c.confidence_score).join(', ')}`
+          : null,
+      },
+      {
+        stage:'⭐', icon:'⭐', name:'Scorer (used by #3 & #4)',
+        status: st((seqClips.length+nonSeq.length)>0, seen(/\[SCORER\]/i)),
+        output: (seqClips.length+nonSeq.length)>0
+          ? `Applied to ${seqClips.length+nonSeq.length} clip(s)`
+          : (seen(/\[SCORER\]/i)?'Completed':null),
+        detail: null,
+      },
+      {
+        stage:'4', icon:'📋', name:'Metadata (Agent #5)',
+        status: st(hasMeta||isDone, hasMeta),
+        output: (seqClips.length+nonSeq.length)>0
+          ? `${seqClips.length+nonSeq.length} clips titled & platform-tagged`
+          : (hasMeta?'Completed':null),
+        detail: null,
+      },
+      {
+        stage:'5', icon:'📊', name:'Ranking',
+        status: st(hasRank||isDone, hasRank),
+        output: (isDone||result)
+          ? `${seqClips.length} sequential · ${nonSeq.length} non-sequential`
+          : (hasRank?'Completed':null),
+        detail: null,
+      },
+    ];
+  }, [logs, result, run?.status]);
+
+  const completedCount = stageRows.filter(r=>r.status==='done'||r.status==='seen').length;
+
+  const StatusBadge = ({s}) => {
+    if(s==='done')    return <span className="text-green-400 font-bold">✓</span>;
+    if(s==='seen')    return <span className="text-yellow-400">✓</span>;
+    if(s==='pending') return <span className="pulse-dot text-yellow-400 text-xs">●</span>;
+    return <span className="text-gray-600">–</span>;
+  };
+
+  return (
+    <div className="max-w-3xl">
+      <div className="rounded-lg border border-border overflow-hidden">
+        <div className="px-4 py-2.5 bg-surface border-b border-border flex items-center justify-between">
+          <span className="text-sm font-semibold text-gray-200">Stage-by-Stage Pipeline Outputs</span>
+          <span className="text-xs text-gray-500 flex items-center gap-2">
+            {completedCount}/{stageRows.length} stages completed
+            {run?.status==='running'&&<span className="pulse-dot text-yellow-400">● running</span>}
+          </span>
+        </div>
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-border bg-[#13131f]">
+              <th className="px-3 py-2 text-left text-xs text-gray-500 font-medium w-10">#</th>
+              <th className="px-3 py-2 text-left text-xs text-gray-500 font-medium">Stage</th>
+              <th className="px-3 py-2 text-center text-xs text-gray-500 font-medium w-16">Status</th>
+              <th className="px-3 py-2 text-left text-xs text-gray-500 font-medium">Output</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stageRows.map((row,i)=>(
+              <tr key={i}
+                className={`border-b border-border/40 transition-opacity ${row.status==='idle'?'opacity-30':''}`}>
+                <td className="px-3 py-2.5 text-xs font-mono text-gray-500">{row.stage}</td>
+                <td className="px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm flex-shrink-0">{row.icon}</span>
+                    <span className="text-xs text-gray-300 font-medium">{row.name}</span>
+                  </div>
+                </td>
+                <td className="px-3 py-2.5 text-center text-sm">
+                  <StatusBadge s={row.status}/>
+                </td>
+                <td className="px-3 py-2.5">
+                  {row.output ? (
+                    <div>
+                      <div className={`text-xs font-medium ${row.status==='done'?'text-gray-100':'text-gray-400'}`}>
+                        {row.output}
+                      </div>
+                      {row.detail&&(
+                        <div className="text-xs text-gray-500 mt-0.5 leading-4 break-all max-w-sm">
+                          {row.detail}
+                        </div>
+                      )}
+                    </div>
+                  ):(
+                    <span className="text-xs text-gray-600 italic">
+                      {row.status==='pending'?'Running…':'Awaiting run'}
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OUTPUT TAB
+// ─────────────────────────────────────────────────────────────────────────────
+function OutputTab({ run, videoAvailable }) {
+  const [view,setView]=useState('summary');
+  const [sortField,setSortField]=useState('score');
+  const [sortDir,setSortDir]=useState('desc');
+  const [playingClip,setPlayingClip]=useState(null);
+  const result=run?.result;
+
+  // Show stage flow even without a result (live during run)
+  if(!result && view !== 'stages') {
+    if (!run) return(
+      <div className="p-8 text-center text-gray-600 fade-in">
+        <div className="text-5xl mb-4">📭</div>
+        <p>No output yet. Run the pipeline first.</p>
+        <button onClick={()=>setView('stages')} className="mt-4 text-xs text-violet-400 hover:text-violet-300 underline">
+          View live stage progress →
+        </button>
+      </div>
+    );
+  }
+
+  const seqClips=(result?.sequential_clips)||[];
+  const nonSeqShorts=(result?.non_sequential_shorts)||[];
+  const usage=(result?.token_usage)||{};
+
+  const sortClips=(clips)=>{
+    const key = sortField==='score'?'confidence_score':sortField==='time'?'video_start_time':'video_start_time';
+    const durKey= sortField==='duration'?'duration':null;
+    return [...clips].sort((a,b)=>{
+      let av=durKey?(a.video_end_time-a.video_start_time):(a[key]??0);
+      let bv=durKey?(b.video_end_time-b.video_start_time):(b[key]??0);
+      return sortDir==='desc'?bv-av:av-bv;
+    });
+  };
+  const sortNonSeq=(shorts)=>{
+    const key=sortField==='score'?'confidence_score':sortField==='duration'?'total_duration':'confidence_score';
+    return [...shorts].sort((a,b)=>sortDir==='desc'?b[key]-a[key]:a[key]-b[key]);
+  };
+
+  const scoreColor=s=>s>=80?'text-green-400':s>=65?'text-yellow-400':'text-red-400';
+  const platBadge=p=>{
+    const c={youtube:'bg-red-900/40 text-red-300',instagram:'bg-pink-900/40 text-pink-300',
+      tiktok:'bg-blue-900/40 text-blue-300',linkedin:'bg-sky-900/40 text-sky-300'};
+    return c[p?.toLowerCase()]||'bg-gray-700 text-gray-300';
+  };
+
+  const SortBar=()=>(
+    <div className="flex items-center gap-3 flex-wrap">
+      <span className="text-xs text-gray-500">Sort by:</span>
+      {['score','time','duration'].map(f=>(
+        <button key={f} onClick={()=>setSortField(f)}
+          className={`text-xs px-2.5 py-1 rounded transition-colors capitalize ${sortField===f?'bg-accent text-white':'bg-gray-800 text-gray-400 hover:text-gray-200'}`}>
+          {f}
+        </button>
+      ))}
+      <button onClick={()=>setSortDir(d=>d==='desc'?'asc':'desc')}
+        className="text-xs px-2.5 py-1 rounded bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors">
+        {sortDir==='desc'?'↓ High → Low':'↑ Low → High'}
+      </button>
+    </div>
+  );
+
+  return(
+    <div className="fade-in flex flex-col" style={{height:'calc(100vh - 112px)'}}>
+      <div className="flex border-b border-border bg-surface px-6 gap-1 flex-shrink-0 flex-wrap">
+        {[
+          {key:'stages',    label:'Stage Flow 🔢'},
+          {key:'summary',   label:'Summary'},
+          {key:'sequential',label:`Sequential (${(result?.sequential_clips||[]).length})`},
+          {key:'nonsequential',label:`Non-Sequential (${(result?.non_sequential_shorts||[]).length})`},
+          {key:'tokens',    label:'Tokens'},
+          {key:'raw',       label:'Raw JSON'},
+        ].map(t=>(
+          <button key={t.key} onClick={()=>setView(t.key)}
+            className={`px-4 py-2.5 text-sm transition-all tab-btn ${view===t.key?'active':''}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-6 pb-20">
+        {/* ── Stage Flow ── */}
+        {view==='stages'&&<StageFlowTable run={run}/>}
+
+        {/* ── Summary ── */}
+        {view==='summary'&&result&&(
+          <div className="space-y-4 max-w-3xl">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[['Category',result.video_category,'🏷️'],
+                ['Duration',`${(result.video_duration||0).toFixed(1)}s`,'⏱️'],
+                ['Sequential',seqClips.length,'🎬'],
+                ['Non-Sequential',nonSeqShorts.length,'✂️']].map(([l,v,i])=>(
+                <div key={l} className="p-4 rounded-lg border border-border bg-surface">
+                  <div className="text-2xl mb-1">{i}</div>
+                  <div className="text-xl font-bold text-gray-100">{v}</div>
+                  <div className="text-xs text-gray-400">{l}</div>
+                </div>
+              ))}
+            </div>
+            <div className="p-4 rounded-lg border border-border bg-surface">
+              <div className="text-xs font-medium text-gray-400 mb-2">CATEGORY REASONING</div>
+              <p className="text-sm text-gray-300">{result.category_reason}</p>
+            </div>
+            {result.dimension_weights&&(
+              <div className="p-4 rounded-lg border border-border bg-surface">
+                <div className="text-xs font-medium text-gray-400 mb-3">DYNAMIC SCORING WEIGHTS</div>
+                <div className="space-y-2">
+                  {Object.entries(result.dimension_weights).map(([dim,w])=>(
+                    <div key={dim} className="flex items-center gap-3">
+                      <div className="text-xs text-gray-400 w-36 capitalize">{dim.replace(/_/g,' ')}</div>
+                      <div className="flex-1 bg-gray-800 rounded-full h-2">
+                        <div className="h-2 rounded-full bg-accent" style={{width:`${w}%`}}/>
+                      </div>
+                      <div className="text-xs text-gray-300 w-8 text-right">{w}%</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {nonSeqShorts.length===0&&(
+              <div className="p-4 rounded-lg border border-amber-800/40 bg-amber-900/10">
+                <div className="text-xs font-medium text-amber-400 mb-1">ℹ Non-Sequential: 0 clips generated</div>
+                <p className="text-xs text-amber-200/70 leading-5">
+                  Agent #2 returned candidates but none could be assembled. This happens when the LLM returns sentence IDs like "S1", "S2" (with an "S" prefix) instead of plain integers.
+                  A fix is patched in runner.py — the next run should produce non-sequential clips. If you still see 0, try running with CLIP_MODE = "non_sequential" to isolate the issue.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Sequential ── */}
+        {view==='sequential'&&result&&(
+          <div className="max-w-3xl space-y-3">
+            <div className="flex items-center justify-between mb-4"><SortBar/></div>
+            {seqClips.length===0&&<p className="text-gray-500">No sequential clips.</p>}
+            {sortClips(seqClips).map((clip,i)=>{
+              const dur=((clip.video_end_time||0)-(clip.video_start_time||0)).toFixed(1);
+              return(
+                <div key={i} className="rounded-lg border border-border bg-surface clip-card overflow-hidden">
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    <span className={`text-xl font-bold flex-shrink-0 w-10 ${scoreColor(clip.confidence_score)}`}>{clip.confidence_score}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-gray-100 truncate">{clip.title||'Untitled'}</div>
+                      <div className="text-xs text-gray-400 mt-0.5">
+                        {clip.video_start_time?.toFixed(1)}s – {clip.video_end_time?.toFixed(1)}s · {dur}s
+                        {clip.section_label&&<span className="ml-2 text-gray-500">· {clip.section_label.split('—')[0].trim()}</span>}
+                      </div>
+                    </div>
+                    <div className="flex gap-1 flex-wrap justify-end max-w-[140px]">
+                      {(clip.social_media||[]).map(p=>(
+                        <span key={p} className={`text-xs px-1.5 py-0.5 rounded font-medium ${platBadge(p)}`}>{p.replace(' Shorts','').replace(' Reels','')}</span>
+                      ))}
+                    </div>
+                    {videoAvailable&&(
+                      <button onClick={()=>setPlayingClip(playingClip?.video_start_time===clip.video_start_time?null:clip)}
+                        className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${playingClip?.video_start_time===clip.video_start_time?'bg-accent text-white':'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}
+                        title="Preview clip in video">
+                        {playingClip?.video_start_time===clip.video_start_time?'⏸':'▶'}
+                      </button>
+                    )}
+                  </div>
+                  {/* Reasoning — always visible */}
+                  <div className="px-4 pb-3 text-xs text-gray-400 border-t border-border/40 pt-2">
+                    <span className="text-gray-500">Reason: </span>{clip.reason}
+                  </div>
+                  {/* Transcript accordion */}
+                  {clip.text&&(
+                    <details className="group">
+                      <summary className="px-4 py-1.5 text-xs text-gray-500 hover:text-gray-300 cursor-pointer flex items-center gap-1 select-none border-t border-border/30">
+                        <span className="group-open:rotate-90 transition-transform inline-block text-xs">▶</span>
+                        📝 Transcript
+                        <span className="ml-auto text-gray-600 font-mono">{clip.text.split(/\s+/).length} words</span>
+                      </summary>
+                      <div className="px-4 pb-3 pt-2">
+                        <div className="bg-gray-900/70 rounded-lg p-3 border border-border/50 max-h-48 overflow-y-auto">
+                          <p className="text-xs text-gray-300 leading-6 whitespace-pre-wrap">{clip.text}</p>
+                        </div>
+                      </div>
+                    </details>
+                  )}
+                  {/* Score breakdown accordion */}
+                  {clip.score_breakdown&&(
+                    <details className="group">
+                      <summary className="px-4 py-1.5 text-xs text-gray-500 hover:text-gray-300 cursor-pointer flex items-center gap-1 select-none border-t border-border/30">
+                        <span className="group-open:rotate-90 transition-transform inline-block text-xs">▶</span>
+                        ⭐ Score breakdown
+                      </summary>
+                      <div className="px-4 pb-3 pt-2 space-y-2 text-xs">
+                        <div className="grid grid-cols-3 gap-2">
+                          {Object.entries(clip.score_breakdown).map(([dim,s])=>(
+                            <div key={dim} className="bg-gray-900 rounded p-2">
+                              <div className="text-gray-500 capitalize text-xs">{dim.replace(/_/g,' ')}</div>
+                              <div className={`font-bold ${scoreColor(s*5)}`}>{s}</div>
+                              {clip.score_reasoning?.[dim]&&<div className="text-gray-500 text-xs mt-1 leading-4">{clip.score_reasoning[dim]}</div>}
+                            </div>
+                          ))}
+                        </div>
+                        {clip.weakest_factor&&<p className="text-amber-400">⚠ Weakest: {clip.weakest_factor} — {clip.improvise}</p>}
+                      </div>
+                    </details>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Non-Sequential ── */}
+        {view==='nonsequential'&&result&&(
+          <div className="max-w-3xl space-y-3">
+            <div className="flex items-center justify-between mb-4">
+              <SortBar/>
+            </div>
+            {nonSeqShorts.length===0?(
+              <div className="p-5 rounded-lg border border-amber-800/40 bg-amber-900/10">
+                <div className="text-sm font-semibold text-amber-400 mb-2">⚠ No non-sequential clips were generated</div>
+                <p className="text-xs text-amber-200/70 leading-5 mb-3">
+                  This typically means Agent #2 returned sentence IDs in "S1", "S2" format (with prefix) but the assembler expected plain numbers. A fix has been applied in runner.py — the next run should work correctly.
+                </p>
+                <p className="text-xs text-amber-200/50 leading-5">
+                  To isolate: set CLIP_MODE = "non_sequential" in Config and re-run. If still 0, check the Logs tab for "[NONSEQ] LLM returned N raw shorts" followed by "[NONSEQ] Agent #2 generated 0 shorts" — this confirms the ID parsing issue.
+                </p>
+              </div>
+            ):(
+              sortNonSeq(nonSeqShorts).map((short,i)=>{
+                const isPlaying=playingClip?.short_id===short.short_id;
+                return(
+                  <div key={i} className="rounded-lg border border-border bg-surface clip-card overflow-hidden">
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <span className={`text-xl font-bold flex-shrink-0 w-10 ${scoreColor(short.confidence_score)}`}>{short.confidence_score}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-gray-100 truncate">{short.title||'Untitled'}</div>
+                        <div className="text-xs text-gray-400 mt-0.5">
+                          {short.total_duration?.toFixed(1)}s total · {short.num_clips} segments from different parts
+                        </div>
+                      </div>
+                      <div className="flex gap-1 flex-wrap justify-end max-w-[140px]">
+                        {(short.social_media||[]).map(p=>(
+                          <span key={p} className={`text-xs px-1.5 py-0.5 rounded font-medium ${platBadge(p)}`}>{p.replace(' Shorts','').replace(' Reels','')}</span>
+                        ))}
+                      </div>
+                      {videoAvailable&&(
+                        <button onClick={()=>setPlayingClip(isPlaying?null:{...short,...(short.clips?.[0]||{}),video_start_time:short.clips?.[0]?.startTime,video_end_time:short.clips?.[short.clips.length-1]?.endTime})}
+                          className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${isPlaying?'bg-accent text-white':'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}
+                          title="Preview first segment in video">
+                          {isPlaying?'⏸':'▶'}
+                        </button>
+                      )}
+                    </div>
+                    {/* Reasoning */}
+                    <div className="px-4 pb-2 text-xs text-gray-400 border-t border-border/40 pt-2">
+                      <span className="text-gray-500">Reason: </span>{short.reason}
+                    </div>
+                    {/* Full combined transcript accordion */}
+                    {short.clips?.length>0&&(
+                      <details className="group">
+                        <summary className="px-4 py-1.5 text-xs text-gray-500 hover:text-gray-300 cursor-pointer flex items-center gap-1 select-none border-t border-border/30">
+                          <span className="group-open:rotate-90 transition-transform inline-block text-xs">▶</span>
+                          📝 Full Transcript
+                          <span className="ml-auto text-gray-600 font-mono">
+                            {(short.clips||[]).reduce((n,c)=>n+(c.text||'').split(/\s+/).length,0)} words across {short.num_clips} segments
+                          </span>
+                        </summary>
+                        <div className="px-4 pb-3 pt-2">
+                          <div className="bg-gray-900/70 rounded-lg p-3 border border-border/50 max-h-52 overflow-y-auto space-y-3">
+                            {(short.clips||[]).map((c,j)=>(
+                              <div key={j}>
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-xs font-semibold text-violet-400">Segment {j+1}</span>
+                                  <span className="text-xs font-mono text-gray-500">
+                                    {(c.startTime??c.start_time??0).toFixed(1)}s – {(c.endTime??c.end_time??0).toFixed(1)}s
+                                    {videoAvailable&&(
+                                      <button onClick={()=>setPlayingClip({...short,video_start_time:c.startTime??c.start_time,video_end_time:c.endTime??c.end_time,title:`${short.title||''} — Seg ${j+1}`})}
+                                        className="ml-2 text-violet-400 hover:text-violet-300">▶</button>
+                                    )}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-gray-300 leading-6">{c.text}</p>
+                                {j<short.clips.length-1&&<div className="border-t border-border/30 mt-2"/>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </details>
+                    )}
+                    {/* Segments + scores accordion */}
+                    <details className="group">
+                      <summary className="px-4 py-1.5 text-xs text-gray-500 hover:text-gray-300 cursor-pointer flex items-center gap-1 select-none border-t border-border/30">
+                        <span className="group-open:rotate-90 transition-transform inline-block text-xs">▶</span>
+                        ⭐ {short.num_clips} segments + score breakdown
+                      </summary>
+                      <div className="px-4 pb-3 space-y-2">
+                        {(short.clips||[]).map((c,j)=>(
+                          <div key={j} className="bg-gray-900 rounded p-2 text-xs">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-gray-500">Segment {j+1}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-violet-300">{(c.startTime??c.start_time??0).toFixed(1)}s – {(c.endTime??c.end_time??0).toFixed(1)}s</span>
+                                <span className="text-gray-500">({(c.duration??0).toFixed(1)}s)</span>
+                                {videoAvailable&&(
+                                  <button onClick={()=>{
+                                    setPlayingClip({...short,video_start_time:c.startTime??c.start_time,video_end_time:c.endTime??c.end_time,title:`${short.title||''} — Segment ${j+1}`});
+                                  }} className="text-violet-400 hover:text-violet-300 text-xs">▶ play</button>
+                                )}
+                              </div>
+                            </div>
+                            <p className="text-gray-300 leading-4">{c.text}</p>
+                          </div>
+                        ))}
+                        {short.score_breakdown&&(
+                          <div className="grid grid-cols-3 gap-1.5 mt-1">
+                            {Object.entries(short.score_breakdown).map(([dim,s])=>(
+                              <div key={dim} className="bg-gray-900 rounded p-1.5 text-xs">
+                                <div className="text-gray-500 capitalize">{dim.replace(/_/g,' ')}</div>
+                                <div className={`font-bold ${scoreColor(s*5)}`}>{s}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </details>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* ── Tokens ── */}
+        {view==='tokens'&&result&&(
+          <div className="max-w-xl space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              {[['Total Tokens',(usage.total_tokens||0).toLocaleString()],
+                ['Input Tokens',(usage.total_input_tokens||0).toLocaleString()],
+                ['Output Tokens',(usage.total_output_tokens||0).toLocaleString()],
+                ['LLM Calls',usage.llm_calls||0],
+                ['Cache Read',(usage.total_cache_read_tokens||0).toLocaleString()],
+                ['Tokens Saved',(usage.total_tokens_saved||0).toLocaleString()],
+              ].map(([k,v])=>(
+                <div key={k} className="p-4 rounded-lg border border-border bg-surface">
+                  <div className="text-xl font-bold text-gray-100">{v}</div>
+                  <div className="text-xs text-gray-400">{k}</div>
+                </div>
+              ))}
+            </div>
+            {usage.calls?.length>0&&(
+              <div className="rounded-lg border border-border overflow-hidden">
+                <div className="px-4 py-2 bg-surface text-xs font-medium text-gray-400 border-b border-border">Per-Call Breakdown</div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead><tr className="border-b border-border">
+                      {['Caller','In','Out','Cache Read','Saved'].map(h=>(
+                        <th key={h} className="px-3 py-2 text-left text-gray-400 font-medium">{h}</th>
+                      ))}
+                    </tr></thead>
+                    <tbody>
+                      {usage.calls.map((c,i)=>(
+                        <tr key={i} className="border-b border-border/50 hover:bg-surface">
+                          <td className="px-3 py-1.5 text-violet-300 font-mono">{c.caller}</td>
+                          <td className="px-3 py-1.5 text-gray-300">{c.input_tokens?.toLocaleString()}</td>
+                          <td className="px-3 py-1.5 text-gray-300">{c.output_tokens?.toLocaleString()}</td>
+                          <td className="px-3 py-1.5 text-yellow-400">{c.cache_read_tokens?.toLocaleString()}</td>
+                          <td className="px-3 py-1.5 text-green-400">{c.tokens_saved?.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Raw JSON ── */}
+        {view==='raw'&&result&&(
+          <div className="monaco-wrap" style={{height:'500px'}}>
+            <MonacoEditor value={JSON.stringify(result,null,2)} language="json" readOnly/>
+          </div>
+        )}
+      </div>
+
+      {/* Floating video player */}
+      {playingClip&&<VideoPlayer clip={playingClip} onClose={()=>setPlayingClip(null)}/>}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VERSIONS TAB
+// ─────────────────────────────────────────────────────────────────────────────
+function VersionsTab({ versions, onSave, onRestore, onDelete }) {
+  const [note,setNote]=useState('');
+  const [saving,setSaving]=useState(false);
+  const handleSave=async()=>{setSaving(true);try{await onSave(note);setNote('');}finally{setSaving(false);}};
+  return(
+    <div className="p-6 fade-in max-w-3xl">
+      <div className="mb-6 p-4 rounded-lg border border-border bg-surface">
+        <h3 className="text-sm font-semibold text-gray-200 mb-3">Save Current Snapshot</h3>
+        <div className="flex gap-2">
+          <input className="flex-1 bg-gray-900 border border-border rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-accent"
+            placeholder="Optional note (e.g. 'Tweaked scorer prompt')" value={note}
+            onChange={e=>setNote(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleSave()}/>
+          <button onClick={handleSave} disabled={saving}
+            className="px-4 py-2 bg-accent hover:bg-violet-600 text-white rounded text-sm font-medium transition-colors">
+            {saving?'Saving…':'Save'}
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 mt-2">Saves current prompts + config. Restore any snapshot at any time.</p>
+      </div>
+      <h3 className="text-sm font-semibold text-gray-200 mb-3">History ({versions.length})</h3>
+      {versions.length===0&&<p className="text-gray-500 text-sm">No saved versions yet.</p>}
+      <div className="space-y-2">
+        {versions.map((v,i)=>(
+          <div key={v.id} className="rounded-lg border border-border bg-surface p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  {i===0&&<span className="text-xs bg-green-900/40 text-green-300 px-1.5 py-0.5 rounded">latest</span>}
+                  <span className="text-xs font-mono text-gray-400">{new Date(v.timestamp).toLocaleString()}</span>
+                </div>
+                {v.note&&<p className="text-sm text-gray-200 mt-1">{v.note}</p>}
+                <div className="text-xs text-gray-600 font-mono mt-1">ID: {v.id}</div>
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                <button onClick={()=>{ if(confirm('Restore this version?'))onRestore(v.id); }}
+                  className="px-3 py-1 text-xs bg-indigo-900/50 hover:bg-indigo-800 text-indigo-300 rounded transition-colors">Restore</button>
+                <button onClick={()=>{ if(confirm('Delete?'))onDelete(v.id); }}
+                  className="px-3 py-1 text-xs bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded transition-colors">Delete</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXPORT TAB
+// ─────────────────────────────────────────────────────────────────────────────
+function ExportTab({ run }) {
+  const runId=run?.id, hasResult=!!run?.result;
+  const dl=(url,fname)=>{ const a=document.createElement('a');a.href=url;a.download=fname;a.click(); };
+  return(
+    <div className="p-6 fade-in max-w-2xl space-y-6">
+      <div><h2 className="text-lg font-semibold text-gray-200 mb-1">Export & Download</h2>
+        <p className="text-sm text-gray-400">Download pipeline outputs, prompts, or configuration.</p></div>
+      <div className="rounded-lg border border-border overflow-hidden">
+        <div className="px-4 py-2 bg-surface border-b border-border text-sm font-medium text-gray-300">🎬 Run Results {runId&&<span className="text-xs text-gray-500 ml-1">({runId})</span>}</div>
+        <div className="p-4 space-y-3">
+          {[{fmt:'json',label:'Result JSON',desc:'Full output with all clips, scores, token usage'},
+            {fmt:'markdown',label:'Markdown Report',desc:'Human-readable clip list with metadata'}].map(item=>(
+            <div key={item.fmt} className="flex items-center justify-between p-3 rounded bg-gray-900 border border-border">
+              <div><div className="text-sm font-medium text-gray-200">{item.label}</div>
+                <div className="text-xs text-gray-400 mt-0.5">{item.desc}</div></div>
+              <button disabled={!hasResult}
+                onClick={()=>dl(`/api/export/${runId}?format=${item.fmt}`,`result_${runId}.${item.fmt==='json'?'json':'md'}`)}
+                className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${hasResult?'bg-accent hover:bg-violet-600 text-white':'bg-gray-700 text-gray-500 cursor-not-allowed'}`}>
+                Download
+              </button>
+            </div>
+          ))}
+          {!hasResult&&<p className="text-xs text-gray-500">Run the pipeline first.</p>}
+        </div>
+      </div>
+      <div className="rounded-lg border border-border overflow-hidden">
+        <div className="px-4 py-2 bg-surface border-b border-border text-sm font-medium text-gray-300">🗂️ Configuration</div>
+        <div className="p-4 space-y-3">
+          {[{url:'/api/export/current?format=prompts',label:'Prompts JSON',fname:'prompts.json',desc:'All 8 prompt templates'},
+            {url:'/api/export/current?format=config',label:'Config JSON',fname:'config.json',desc:'All pipeline config values'}].map(item=>(
+            <div key={item.label} className="flex items-center justify-between p-3 rounded bg-gray-900 border border-border">
+              <div><div className="text-sm font-medium text-gray-200">{item.label}</div>
+                <div className="text-xs text-gray-400 mt-0.5">{item.desc}</div></div>
+              <button onClick={()=>dl(item.url,item.fname)}
+                className="px-4 py-1.5 rounded text-sm font-medium bg-accent hover:bg-violet-600 text-white transition-colors">Download</button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// APP
+// ─────────────────────────────────────────────────────────────────────────────
+function App() {
+  const [activeTab,setActiveTab]=useState('architecture');
+  const [prompts,setPrompts]=useState({});
+  const [config,setConfig]=useState({});
+  const [schema,setSchema]=useState({});
+  const [versions,setVersions]=useState([]);
+  const [run,setRun]=useState(null);
+  const [status,setStatus]=useState(null);
+  const [videoAvailable,setVideoAvailable]=useState(false);
+  const [toast,setToast]=useState(null);
+  const sseRef=useRef(null);
+
+  const showToast=(msg,type='info')=>setToast({msg,type});
+
+  useEffect(()=>{
+    Promise.all([
+      api.get('/prompts'),api.get('/config'),api.get('/config/schema'),
+      api.get('/versions'),api.get('/status'),api.get('/video/info'),
+    ]).then(([p,c,s,v,st,vi])=>{
+      setPrompts(p);setConfig(c);setSchema(s);
+      setVersions(v.versions||[]);setStatus(st);
+      setVideoAvailable(vi.exists||false);
+    }).catch(e=>showToast('Backend connection failed: '+e.message,'error'));
+    const iv=setInterval(()=>{
+      api.get('/status').then(setStatus).catch(()=>{});
+    },5000);
+    return()=>clearInterval(iv);
+  },[]);
+
+  const startSSE=useCallback((runId)=>{
+    if(sseRef.current)sseRef.current.close();
+    const es=new EventSource(`/api/stream/${runId}`);
+    es.onmessage=e=>{
+      const data=JSON.parse(e.data);
+      if(data.type==='log'){
+        setRun(p=>({...p,logs:[...(p?.logs||[]),data]}));
+      } else if(data.type==='done'){
+        if(data.status==='success'){
+          api.get(`/runs/${runId}/result`).then(result=>{
+            setRun(p=>({...p,status:'success',result}));
+            const s=`${result.sequential_clips?.length||0} sequential, ${result.non_sequential_shorts?.length||0} non-sequential clips.`;
+            showToast('Pipeline complete! '+s,'success');
+          });
+        } else {
+          setRun(p=>({...p,status:'error'}));
+          showToast('Pipeline failed — check Logs tab.','error');
+        }
+        es.close();
+      }
+    };
+    es.onerror=()=>es.close();
+    sseRef.current=es;
+  },[]);
+
+  const handleStartRun=async(clipMode,saveVer)=>{
+    setRun({id:null,status:'starting',logs:[],result:null});
+    setActiveTab('logs');
+    try{
+      const {run_id}=await api.post('/run',{clip_mode:clipMode,save_version:saveVer});
+      setRun(p=>({...p,id:run_id,status:'running'}));
+      startSSE(run_id);
+    }catch(err){
+      showToast(err.message||'Failed to start run','error');
+      setRun(p=>({...p,status:'error'}));
+    }
+  };
+
+  const handleSavePrompts=async(u)=>{ const r=await api.put('/prompts',u);setPrompts(r);showToast('Prompt saved!','success'); };
+  const handleResetPrompt=async(n)=>{ const {value}=await api.post(`/prompts/${n}/reset`);setPrompts(p=>({...p,[n]:value}));showToast('Reset to default.','info');return value; };
+  const handleSaveConfig=async(u)=>{ const r=await api.put('/config',u);setConfig(r);showToast('Config saved!','success'); };
+  const handleResetConfig=async()=>{ const r=await api.post('/config/reset');setConfig(r);showToast('Config reset.','info'); };
+  const handleSaveVersion=async(note)=>{ await api.post('/versions',{note});const{versions:vv}=await api.get('/versions');setVersions(vv);showToast('Version saved!','success'); };
+  const handleRestoreVersion=async(id)=>{ await api.post(`/versions/${id}/restore`);const[p,c]=await Promise.all([api.get('/prompts'),api.get('/config')]);setPrompts(p);setConfig(c);const{versions:vv}=await api.get('/versions');setVersions(vv);showToast('Version restored!','success'); };
+  const handleDeleteVersion=async(id)=>{ await api.del(`/versions/${id}`);setVersions(p=>p.filter(v=>v.id!==id));showToast('Deleted.','info'); };
+
+  const tabs=[
+    {key:'architecture',label:'Architecture',icon:'🏗️'},
+    {key:'prompts',label:'Prompts',icon:'✏️'},
+    {key:'config',label:'Config',icon:'⚙️'},
+    {key:'logs',label:'Logs',icon:'📋',badge:run?.status==='running'?'●':null},
+    {key:'output',label:'Output',icon:'📊',badge:run?.result?(run.result.sequential_clips?.length||0)+(run.result.non_sequential_shorts?.length||0):null},
+    {key:'versions',label:'Versions',icon:'🕐',badge:versions.length||null},
+    {key:'export',label:'Export',icon:'📤'},
+  ];
+
+  return(
+    <div className="flex flex-col min-h-screen bg-[#0f0f17]">
+      {/* Header */}
+      <header className="flex items-center justify-between px-6 py-3 border-b border-border bg-[#12121f] flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <span className="text-xl">🎬</span>
+          <div>
+            <h1 className="text-base font-bold text-gray-100 leading-none">Prompt Engineering Playground</h1>
+            <p className="text-xs text-gray-500 mt-0.5">Video Clipping Pipeline</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          {status&&(
+            <div className="flex items-center gap-3 text-xs text-gray-500">
+              <span className={`flex items-center gap-1 ${status.transcript_exists?'text-green-400':'text-red-400'}`}>
+                {status.transcript_exists?'✓':'✗'} transcript
+              </span>
+              <span className={`flex items-center gap-1 ${videoAvailable?'text-green-400':'text-gray-500'}`}>
+                {videoAvailable?'✓':'○'} video
+              </span>
+              <span className="text-gray-400 font-mono">{status.model}</span>
+            </div>
+          )}
+          {run?.status==='running'&&(
+            <span className="flex items-center gap-1.5 text-sm text-yellow-400">
+              <span className="pulse-dot w-2 h-2 rounded-full bg-yellow-400 inline-block"></span>Running
+            </span>
+          )}
+          <button onClick={()=>handleStartRun(config.CLIP_MODE||'both',false)}
+            disabled={run?.status==='running'||!status?.transcript_exists}
+            className={`flex items-center gap-2 px-5 py-2 rounded-lg font-semibold text-sm transition-all ${run?.status==='running'||!status?.transcript_exists?'bg-gray-700 text-gray-500 cursor-not-allowed':'bg-accent hover:bg-violet-600 text-white shadow-lg shadow-violet-900/30'}`}>
+            ▶ Run Pipeline
+          </button>
+        </div>
+      </header>
+
+      {/* Tabs */}
+      <nav className="flex border-b border-border bg-[#12121f] px-6 flex-shrink-0">
+        {tabs.map(t=>(
+          <button key={t.key} onClick={()=>setActiveTab(t.key)}
+            className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium text-gray-400 tab-btn ${activeTab===t.key?'active':''}`}>
+            <span>{t.icon}</span>{t.label}
+            {t.badge&&(
+              <span className={`text-xs rounded-full px-1.5 py-0.5 min-w-[18px] text-center ${t.badge==='●'?'text-yellow-400 animate-pulse':'bg-accent/20 text-violet-300'}`}>
+                {t.badge}
+              </span>
+            )}
+          </button>
+        ))}
+      </nav>
+
+      {/* Content */}
+      <main className="flex-1 overflow-hidden">
+        <div className="h-full overflow-y-auto">
+          {activeTab==='architecture'&&<div style={{height:'calc(100vh - 112px)'}}><ArchitectureTab/></div>}
+          {activeTab==='prompts'&&<PromptsTab prompts={prompts} onSave={handleSavePrompts} onReset={handleResetPrompt}/>}
+          {activeTab==='config'&&<ConfigTab config={config} schema={schema} onSave={handleSaveConfig} onReset={handleResetConfig}/>}
+          {activeTab==='logs'&&<LogsTab run={run} onStartRun={handleStartRun} status={status}/>}
+          {activeTab==='output'&&<OutputTab run={run} videoAvailable={videoAvailable}/>}
+          {activeTab==='versions'&&<VersionsTab versions={versions} onSave={handleSaveVersion} onRestore={handleRestoreVersion} onDelete={handleDeleteVersion}/>}
+          {activeTab==='export'&&<ExportTab run={run}/>}
+        </div>
+      </main>
+
+      {toast&&<Toast msg={toast.msg} type={toast.type} onClose={()=>setToast(null)}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

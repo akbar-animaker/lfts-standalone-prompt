@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  playground:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: clipping-playground:latest
+    container_name: clipping-playground
+
+    ports:
+      - "8765:8765"
+
+    environment:
+      # ── Required ──────────────────────────────────────────────────────────
+      CLAUDE_API_KEY: ${CLAUDE_API_KEY}          # set in .env or export before running
+
+      # ── Optional overrides ────────────────────────────────────────────────
+      PLAYGROUND_PORT: "8765"
+      DOCKER_ENV: "1"
+      TRANSCRIPT_PATH: "/app/data/transcript.json"
+      VIDEO_PATH: "/app/data/input.mp4"
+
+    volumes:
+      # Media files (transcript + video) — place them in ./data/ on the host
+      - ./data:/app/data
+
+      # Persisted state: saved prompts, configs, version history, run results
+      - ./storage:/app/storage
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8765/api/status')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
