@@ -4,6 +4,7 @@ Uses JSON files in the storage/ directory.
 """
 import json
 import os
+import shutil
 import threading
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -247,3 +248,101 @@ def list_runs() -> List[Dict]:
                     "summary": data.get("summary", {}),
                 })
     return runs[:20]
+
+
+# ── Storage management ─────────────────────────────────────────────────────────
+
+_DOWNLOADS_DIR = os.path.join(STORAGE_DIR, "downloads")
+
+STORAGE_AREAS = {
+    "runs": {
+        "label": "Run Results",
+        "description": "One folder per run — result.json, speakers.json, run_args.json",
+        "icon": "📊",
+        "path": RUNS_DIR,
+        "type": "dir",
+    },
+    "downloads": {
+        "label": "Downloaded Projects",
+        "description": "Transcripts and videos fetched by Project ID (can be large)",
+        "icon": "⬇",
+        "path": _DOWNLOADS_DIR,
+        "type": "dir",
+    },
+    "versions": {
+        "label": "Version History",
+        "description": "Saved prompt + config snapshots",
+        "icon": "🕐",
+        "path": VERSIONS_FILE,
+        "type": "file",
+    },
+}
+
+
+def _dir_stats(path: str) -> Dict:
+    """Recursively count files and total size (bytes) under path."""
+    if not os.path.exists(path):
+        return {"files": 0, "size_bytes": 0}
+    total_files, total_bytes = 0, 0
+    for root, _, files in os.walk(path):
+        for f in files:
+            try:
+                total_bytes += os.path.getsize(os.path.join(root, f))
+                total_files += 1
+            except OSError:
+                pass
+    return {"files": total_files, "size_bytes": total_bytes}
+
+
+def get_storage_info() -> Dict:
+    result = {}
+    for key, area in STORAGE_AREAS.items():
+        info = {
+            "label":       area["label"],
+            "description": area["description"],
+            "icon":        area["icon"],
+        }
+        path = area["path"]
+        if area["type"] == "dir":
+            stats = _dir_stats(path)
+            # top-level item count (subdirs or files depending on area)
+            if os.path.exists(path):
+                items = len(os.listdir(path))
+            else:
+                items = 0
+            info["items"]      = items
+            info["files"]      = stats["files"]
+            info["size_mb"]    = round(stats["size_bytes"] / 1024 / 1024, 2)
+        else:  # single json file
+            if os.path.exists(path):
+                size = os.path.getsize(path)
+                # for versions, items = number of saved versions
+                data = _read_json(path, [])
+                info["items"]   = len(data) if isinstance(data, list) else 1
+                info["files"]   = 1
+                info["size_mb"] = round(size / 1024 / 1024, 4)
+            else:
+                info["items"]   = 0
+                info["files"]   = 0
+                info["size_mb"] = 0
+        result[key] = info
+    return result
+
+
+def clear_storage_areas(areas: List[str]) -> Dict:
+    cleared = {}
+    for key in areas:
+        area = STORAGE_AREAS.get(key)
+        if not area:
+            continue
+        path = area["path"]
+        if area["type"] == "dir":
+            if os.path.exists(path):
+                shutil.rmtree(path)
+            os.makedirs(path, exist_ok=True)
+        else:
+            # Reset file to empty list/object
+            with _lock:
+                _write_json(path, [])
+        cleared[key] = True
+    return {"cleared": cleared}

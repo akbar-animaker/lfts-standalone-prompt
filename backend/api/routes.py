@@ -369,6 +369,23 @@ def video_info():
     }
 
 
+# ── Storage management ────────────────────────────────────────────────────────
+
+@router.get("/storage/info")
+def get_storage_info():
+    return storage.get_storage_info()
+
+
+class ClearStorageRequest(BaseModel):
+    areas: list
+
+
+@router.post("/storage/clear")
+def clear_storage(req: ClearStorageRequest):
+    result = storage.clear_storage_areas(req.areas)
+    return result
+
+
 # ── Export ─────────────────────────────────────────────────────────────────────
 
 @router.get("/export/current")
