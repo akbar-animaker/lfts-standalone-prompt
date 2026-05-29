@@ -1063,20 +1063,45 @@ function OutputTab({ run, videoAvailable }) {
   const [sortField,setSortField]=useState('score');
   const [sortDir,setSortDir]=useState('desc');
   const [playingClip,setPlayingClip]=useState(null);
-  const result=run?.result;
 
-  // Show stage flow even without a result (live during run)
-  if(!result && view !== 'stages' && view !== 'all') {
-    if (!run) return(
-      <div className="p-8 text-center text-gray-600 fade-in">
-        <div className="text-5xl mb-4">📭</div>
-        <p>No output yet. Run the pipeline first.</p>
-        <button onClick={()=>setView('stages')} className="mt-4 text-xs text-violet-400 hover:text-violet-300 underline">
-          View live stage progress →
-        </button>
-      </div>
-    );
-  }
+  // ── Run history ───────────────────────────────────────────────────────────
+  const [runList,setRunList]=useState([]);
+  const [selRunId,setSelRunId]=useState(null);
+  const [selResult,setSelResult]=useState(null);
+  const [loadingRes,setLoadingRes]=useState(false);
+
+  const refreshList=()=>api.get('/runs').then(d=>setRunList(d.runs||[])).catch(()=>{});
+
+  const loadRun=async(runId)=>{
+    if(!runId)return;
+    // Use in-memory result for current live run
+    if(runId===run?.id && run?.result){ setSelRunId(runId);setSelResult(run.result);return; }
+    setLoadingRes(true);
+    try{
+      const r=await api.get(`/runs/${runId}/result`);
+      setSelRunId(runId); setSelResult(r);
+    }catch(e){ setSelResult(null); }
+    finally{ setLoadingRes(false); }
+  };
+
+  // On mount: load list, auto-select newest
+  useEffect(()=>{
+    api.get('/runs').then(d=>{
+      const list=d.runs||[];
+      setRunList(list);
+      if(list.length>0 && !selRunId) loadRun(list[0].run_id);
+    }).catch(()=>{});
+  },[]);
+
+  // When live run completes: refresh list + select it
+  useEffect(()=>{
+    if(run?.result && run?.id){
+      setSelRunId(run.id); setSelResult(run.result);
+      refreshList();
+    }
+  },[run?.result]);
+
+  const result=selResult;
 
   const seqClips=(result?.sequential_clips)||[];
   const nonSeqShorts=(result?.non_sequential_shorts)||[];
@@ -1120,25 +1145,74 @@ function OutputTab({ run, videoAvailable }) {
   );
 
   return(
-    <div className="fade-in flex flex-col" style={{height:'calc(100vh - 112px)'}}>
-      <div className="flex border-b border-border bg-surface px-6 gap-1 flex-shrink-0 flex-wrap">
-        {[
-          {key:'stages',       label:'Stage Flow 🔢'},
-          {key:'summary',      label:'Summary'},
-          {key:'all',          label:`All Shorts (${((result?.sequential_clips||[]).length)+((result?.non_sequential_shorts||[]).length)})`},
-          {key:'sequential',   label:`Sequential (${(result?.sequential_clips||[]).length})`},
-          {key:'nonsequential',label:`Non-Sequential (${(result?.non_sequential_shorts||[]).length})`},
-          {key:'tokens',       label:'Tokens'},
-          {key:'raw',          label:'Raw JSON'},
-        ].map(t=>(
-          <button key={t.key} onClick={()=>setView(t.key)}
-            className={`px-4 py-2.5 text-sm transition-all tab-btn ${view===t.key?'active':''}`}>
-            {t.label}
-          </button>
-        ))}
+    <div className="fade-in flex" style={{height:'calc(100vh - 112px)'}}>
+
+      {/* ── Run history sidebar ── */}
+      <div className="w-52 flex-shrink-0 border-r border-border flex flex-col bg-surface/40">
+        <div className="px-3 py-2 border-b border-border flex items-center justify-between flex-shrink-0">
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Run History</span>
+          <button onClick={refreshList} className="text-xs text-gray-600 hover:text-gray-400 transition-colors" title="Refresh list">↻</button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {runList.length===0?(
+            <div className="p-4 text-xs text-gray-600 text-center">No saved runs yet.</div>
+          ):(
+            runList.map(r=>{
+              const isSel=selRunId===r.run_id;
+              const isLive=r.run_id===run?.id;
+              const dt=r.start_time?new Date(r.start_time):null;
+              return(
+                <button key={r.run_id} onClick={()=>loadRun(r.run_id)}
+                  className={`w-full text-left px-3 py-2.5 border-b border-border/40 transition-all ${isSel?'bg-accent/20 border-l-2 border-l-accent':'hover:bg-surface'}`}>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${r.status==='success'?'bg-green-400':r.status==='error'?'bg-red-400':'bg-yellow-400'}`}/>
+                    <span className={`text-xs font-mono ${isSel?'text-violet-300':'text-gray-300'}`}>{r.run_id}</span>
+                    {isLive&&<span className="ml-auto text-xs text-violet-400">live</span>}
+                  </div>
+                  {dt&&<div className="text-xs text-gray-500 mt-0.5 pl-3">{dt.toLocaleDateString()} {dt.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div>}
+                  {r.summary&&r.summary.sequential_count!==undefined&&(
+                    <div className="text-xs text-gray-600 mt-0.5 pl-3">
+                      {r.summary.sequential_count}s · {r.summary.non_sequential_count}n · {r.summary.category||''}
+                    </div>
+                  )}
+                </button>
+              );
+            })
+          )}
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 pb-20">
+      {/* ── Result viewer ── */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex border-b border-border bg-surface px-4 gap-1 flex-shrink-0 flex-wrap">
+          {[
+            {key:'stages',       label:'Stage Flow 🔢'},
+            {key:'summary',      label:'Summary'},
+            {key:'all',          label:`All Shorts (${((result?.sequential_clips||[]).length)+((result?.non_sequential_shorts||[]).length)})`},
+            {key:'sequential',   label:`Sequential (${(result?.sequential_clips||[]).length})`},
+            {key:'nonsequential',label:`Non-Sequential (${(result?.non_sequential_shorts||[]).length})`},
+            {key:'tokens',       label:'Tokens'},
+            {key:'raw',          label:'Raw JSON'},
+          ].map(t=>(
+            <button key={t.key} onClick={()=>setView(t.key)}
+              className={`px-3 py-2.5 text-sm transition-all tab-btn ${view===t.key?'active':''}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {loadingRes&&(
+          <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">Loading result…</div>
+        )}
+
+        {!loadingRes&&!result&&!run&&(
+          <div className="flex-1 flex flex-col items-center justify-center text-gray-600 fade-in">
+            <div className="text-5xl mb-4">📭</div>
+            <p>No runs yet. Run the pipeline first.</p>
+          </div>
+        )}
+
+      <div className={`flex-1 overflow-y-auto p-6 pb-20 ${loadingRes||(!result&&!run)?'hidden':''}`}>
         {/* ── Stage Flow ── */}
         {view==='stages'&&<StageFlowTable run={run}/>}
 
@@ -1531,7 +1605,8 @@ function OutputTab({ run, videoAvailable }) {
 
       {/* Floating video player */}
       {playingClip&&<VideoPlayer clip={playingClip} onClose={()=>setPlayingClip(null)}/>}
-    </div>
+      </div>{/* closes flex-1 viewer */}
+    </div>{/* closes root flex */}
   );
 }
 

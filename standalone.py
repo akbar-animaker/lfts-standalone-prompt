@@ -104,7 +104,7 @@ SECTION_BREAK_GAP_THRESHOLD = 3.0   # seconds
 
 TARGET_SCORE = 90
 MAX_ITERATIONS_PER_SHORT_SEQUENCE = 1
-MAX_ITERATIONS_PER_SHORT_NONSEQUENCE = 0
+MAX_ITERATIONS_PER_SHORT_NONSEQUENCE = 1
 SCORE_MARKET_ADJUSTMENT = 0
 
 # ── Clip refinement (Agent #3) ───────────────────────────────────────────────
@@ -253,6 +253,10 @@ Once a clip passes 75, note its estimated score in this format:
 Hook: /{w_hook} | Reframe: /{w_reframe} | Emotion: /{w_emotion} | Clarity: /{w_clarity} | Quotability: /{w_quotable} | Ending: /{w_ending} | Pacing: /{w_pacing} | Total: /100
 
 Scale the number of clips to the video's length. A 10-minute video should yield around 6 clips. Longer videos should produce more, proportionally. But never compromise the 75-point minimum — quality always wins.
+
+## ENDING RULE (non-negotiable)
+The LAST sentence you select MUST be a landing line — a conclusion, payoff, punchline, takeaway, or clear resolution of the story. NEVER end on a setup, a sentence that introduces something it doesn't resolve, or a line that trails off mid-thought (e.g. "...you give them good data.", "...part of those..."). If the natural payoff is the very next sentence after your last pick, extend the selection to include it. A clip that sets up an idea but cuts before landing it is incomplete and must be re-selected so it ends on the resolving line.
+
 Finally, ask: would someone scrolling their feed stop, watch, and feel completely satisfied by this clip alone — with no knowledge of the original video? If anything feels missing, disjointed, or incomplete — re-select segments, adjust the joins, or rethink the story.
 
 Keep each clip between 30 to 90 seconds. Duration is not a creative decision — it is a byproduct of the story. Never cut a story short to fit the range, and never pad a clip to reach it.

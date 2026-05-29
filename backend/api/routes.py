@@ -148,6 +148,12 @@ async def stream_logs(run_id: str):
     )
 
 
+@router.get("/runs")
+def list_runs():
+    """List all saved run results, newest first."""
+    return {"runs": storage.list_runs()}
+
+
 @router.get("/runs/active")
 def get_active_run():
     active_id = runner.get_active_run_id()
