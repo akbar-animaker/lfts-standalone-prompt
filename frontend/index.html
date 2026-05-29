@@ -1060,30 +1060,46 @@ function StageFlowTable({ run }) {
 // ─────────────────────────────────────────────────────────────────────────────
 function InlineClipPlayer({ clip, videoUrl }) {
   const videoRef = useRef(null);
-  const clipRef  = useRef(clip);
+  const startTime = clip?.video_start_time ?? 0;
+  const endTime   = clip?.video_end_time   ?? Infinity;
+  const endRef    = useRef(endTime);
 
+  // Keep endRef current so timeupdate handler always has latest value
+  useEffect(()=>{ endRef.current = endTime; });
+
+  // Seek to clip start whenever the start time changes or the video src loads
   useEffect(()=>{
-    clipRef.current = clip;
-    if(videoRef.current){
-      const start = clip?.video_start_time ?? 0;
-      videoRef.current.currentTime = start;
+    const video = videoRef.current;
+    if(!video) return;
+    const doSeek = ()=>{ try{ video.currentTime = startTime; }catch(e){} };
+    // readyState >= 1 means HAVE_METADATA — we can seek immediately
+    if(video.readyState >= 1){
+      doSeek();
+    } else {
+      video.addEventListener('loadedmetadata', doSeek, {once:true});
+      return ()=>video.removeEventListener('loadedmetadata', doSeek);
     }
-  },[clip]);
+  },[startTime, videoUrl]);
 
-  const handleLoadedData = ()=>{
-    const start = clipRef.current?.video_start_time ?? 0;
-    if(videoRef.current) videoRef.current.currentTime = start;
+  const handleLoadedMetadata = ()=>{
+    try{ videoRef.current.currentTime = startTime; }catch(e){}
   };
 
   const handleTimeUpdate = ()=>{
-    const end = clipRef.current?.video_end_time ?? Infinity;
-    if(videoRef.current && end < Infinity && videoRef.current.currentTime >= end)
-      videoRef.current.pause();
+    const video = videoRef.current;
+    const end   = endRef.current;
+    if(video && end < Infinity && video.currentTime >= end){
+      video.pause();
+      // snap back to end boundary so scrubber looks clean
+      try{ video.currentTime = end; }catch(e){}
+    }
   };
 
   return(
-    <video ref={videoRef} src={videoUrl} onLoadedData={handleLoadedData}
-      onTimeUpdate={handleTimeUpdate} controls
+    <video ref={videoRef} src={videoUrl}
+      onLoadedMetadata={handleLoadedMetadata}
+      onTimeUpdate={handleTimeUpdate}
+      controls
       className="w-full block" style={{maxHeight:'190px',background:'#000'}}/>
   );
 }
@@ -1440,8 +1456,13 @@ function OutputTab({ run, videoAvailable }) {
                 const isSel=isSeq
                   ? selectedClip?.video_start_time===item.video_start_time
                   : selectedClip?.short_id===item.short_id;
+                // For non-seq, attach first-segment times
+                const clipForPanel = isSeq ? item : {...item,
+                  video_start_time: item.clips?.[0]?.startTime ?? item.clips?.[0]?.start_time,
+                  video_end_time:   item.clips?.[0]?.endTime   ?? item.clips?.[0]?.end_time,
+                };
                 return(
-                  <div key={i} onClick={()=>setSelectedClip(item)} className={`rounded-lg border bg-surface clip-card overflow-hidden cursor-pointer transition-all ${isSel?'border-accent ring-1 ring-accent/40':'border-border hover:border-gray-600'}`}>
+                  <div key={i} onClick={()=>setSelectedClip(clipForPanel)} className={`rounded-lg border bg-surface clip-card overflow-hidden cursor-pointer transition-all ${isSel?'border-accent ring-1 ring-accent/40':'border-border hover:border-gray-600'}`}>
                     <div className="flex items-center gap-3 px-4 py-3">
                       <span className={`text-xl font-bold flex-shrink-0 w-10 ${scoreColor(item.confidence_score)}`}>{item.confidence_score}</span>
                       <span className={`text-xs px-2 py-0.5 rounded font-semibold flex-shrink-0 ${isSeq?'bg-violet-900/50 text-violet-300':'bg-teal-900/50 text-teal-300'}`}>
@@ -1460,7 +1481,7 @@ function OutputTab({ run, videoAvailable }) {
                           <span key={p} className={`text-xs px-1.5 py-0.5 rounded font-medium ${platBadge(p)}`}>{p.replace(' Shorts','').replace(' Reels','')}</span>
                         ))}
                       </div>
-                      <button onClick={e=>{e.stopPropagation();setSelectedClip(isSel?null:item);}}
+                      <button onClick={e=>{e.stopPropagation();setSelectedClip(isSel?null:clipForPanel);}}
                         className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${isSel?'bg-accent text-white':'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}>
                         {isSel?'✕':'▶'}
                       </button>
@@ -1604,8 +1625,13 @@ function OutputTab({ run, videoAvailable }) {
             ):(
               sortNonSeq(nonSeqShorts).map((short,i)=>{
                 const isSel=selectedClip?.short_id===short.short_id;
+                // Attach first-segment times so the video player can seek
+                const nsWithTimes={...short,
+                  video_start_time: short.clips?.[0]?.startTime ?? short.clips?.[0]?.start_time,
+                  video_end_time:   short.clips?.[0]?.endTime   ?? short.clips?.[0]?.end_time,
+                };
                 return(
-                  <div key={i} onClick={()=>setSelectedClip(short)} className={`rounded-lg border bg-surface clip-card overflow-hidden cursor-pointer transition-all ${isSel?'border-accent ring-1 ring-accent/40':'border-border hover:border-gray-600'}`}>
+                  <div key={i} onClick={()=>setSelectedClip(nsWithTimes)} className={`rounded-lg border bg-surface clip-card overflow-hidden cursor-pointer transition-all ${isSel?'border-accent ring-1 ring-accent/40':'border-border hover:border-gray-600'}`}>
                     <div className="flex items-center gap-3 px-4 py-3">
                       <span className={`text-xl font-bold flex-shrink-0 w-10 ${scoreColor(short.confidence_score)}`}>{short.confidence_score}</span>
                       <div className="flex-1 min-w-0">
@@ -1619,7 +1645,7 @@ function OutputTab({ run, videoAvailable }) {
                           <span key={p} className={`text-xs px-1.5 py-0.5 rounded font-medium ${platBadge(p)}`}>{p.replace(' Shorts','').replace(' Reels','')}</span>
                         ))}
                       </div>
-                      <button onClick={e=>{e.stopPropagation();setSelectedClip(isSel?null:short);}}
+                      <button onClick={e=>{e.stopPropagation();setSelectedClip(isSel?null:nsWithTimes);}}
                         className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${isSel?'bg-accent text-white':'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}
                         title="Open details">
                         {isSel?'✕':'▶'}
