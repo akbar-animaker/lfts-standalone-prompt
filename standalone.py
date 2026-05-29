@@ -255,7 +255,10 @@ Hook: /{w_hook} | Reframe: /{w_reframe} | Emotion: /{w_emotion} | Clarity: /{w_c
 Scale the number of clips to the video's length. A 10-minute video should yield around 6 clips. Longer videos should produce more, proportionally. But never compromise the 75-point minimum — quality always wins.
 
 ## ENDING RULE (non-negotiable)
-The LAST sentence you select MUST be a landing line — a conclusion, payoff, punchline, takeaway, or clear resolution of the story. NEVER end on a setup, a sentence that introduces something it doesn't resolve, or a line that trails off mid-thought (e.g. "...you give them good data.", "...part of those..."). If the natural payoff is the very next sentence after your last pick, extend the selection to include it. A clip that sets up an idea but cuts before landing it is incomplete and must be re-selected so it ends on the resolving line.
+The LAST sentence you select MUST be a landing line — a conclusion, payoff, punchline, takeaway, or clear resolution of the story. Pick the TIGHTEST ending that feels complete:
+- NOT TOO EARLY: never end on a setup, an unresolved idea, or a line that trails off mid-thought (e.g. "...you give them good data.", "...part of those..."). If the resolving line is the very next sentence, extend to include it.
+- NOT TOO LATE: once the story lands on a strong, self-contained punchline (often a short, punchy declarative line, e.g. "They'll do it."), STOP THERE. Do NOT tack on trailing explanatory, clarifying, recap, or filler sentences (e.g. "Great.", "He wasn't talking about X, he was talking about Y...") that come after the natural punch — they dilute the impact and weaken the ending, even if they add context.
+End on the single strongest conclusive beat. When a punchy line and a longer follow-up explanation both exist, prefer ending on the punchy line.
 
 Finally, ask: would someone scrolling their feed stop, watch, and feel completely satisfied by this clip alone — with no knowledge of the original video? If anything feels missing, disjointed, or incomplete — re-select segments, adjust the joins, or rethink the story.
 
@@ -302,6 +305,9 @@ Transcript: "{cur_text}"
 - Weak hook → add or swap the OPENING sentence for one that grabs attention and makes
   sense with no prior context.
 - Abrupt ending → add a sentence that resolves the thought, or drop a trailing half-sentence.
+- Diluted / padded ending → if the clip lands on a strong punchy line but then continues into
+  explanatory, clarifying, recap, or filler sentences, DROP those trailing sentences so the clip
+  ends on the punch. The tightest complete ending beats a longer one.
 - Weak clarity → add a sentence that supplies the missing context; drop confusing fragments.
 - Drop filler-only sentences ("uh", "um") when they hurt the flow.
 - Keep total duration roughly 30–90s. Keep sentences in chronological order unless a
@@ -350,7 +356,7 @@ Pacing / Energy is added separately from measurements.
 
 **Quotability** (score 0–{w_quotable}): Memorable, repeatable, shareable lines?
 
-**Clean Ending** (score 0–{w_ending}): Satisfying natural end — not mid-sentence or on fillers.
+**Clean Ending** (score 0–{w_ending}): Satisfying natural end. Penalize endings that are mid-sentence or on fillers (too early), AND endings padded with trailing explanatory, clarifying, recap, or filler sentences that continue past a strong natural punchline (too late). The best ending lands on the single strongest conclusive beat and stops.
 
 ## REQUIRED OUTPUT
 
@@ -1349,7 +1355,20 @@ def score_single_short(short, scoring_config, all_words=None):
     scoring_config: dict from get_scoring_config() with weights + weights_raw.
     all_words: optional word list for measured pacing stats in the scorer prompt.
     """
-    text_preview = " ".join(short["text"].split()[:100]) + "..."
+    # The scorer judges Hook (opening) AND Clean Ending (closing), so it must see
+    # BOTH ends of the clip verbatim. Truncating to the first N words + "..." made
+    # every long clip look like it ended mid-sentence, tanking clean_ending. Show the
+    # full text when short; otherwise head + real tail, with no trailing ellipsis so
+    # the true final words are visible.
+    _words = short["text"].split()
+    if len(_words) <= 220:
+        text_preview = short["text"]
+    else:
+        text_preview = (
+            " ".join(_words[:120])
+            + " [ … middle trimmed … ] "
+            + " ".join(_words[-80:])
+        )
     dimension_weights = scoring_config["weights"]
     weights_raw = scoring_config["weights_raw"]
 

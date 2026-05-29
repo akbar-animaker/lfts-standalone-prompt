@@ -1105,7 +1105,13 @@ function OutputTab({ run, videoAvailable }) {
 
   // Per-run video URL — isolates each user's video from the global config
   const runVideoUrl = selRunId ? `/api/runs/${selRunId}/video` : null;
-  const runVideoAvailable = !!(result?.video_path || (run?.id===selRunId && videoAvailable));
+  const [runVideoAvailable, setRunVideoAvailable] = useState(false);
+  useEffect(()=>{
+    if(!selRunId){ setRunVideoAvailable(false); return; }
+    fetch(`/api/runs/${selRunId}/video`,{method:'HEAD'})
+      .then(r=>setRunVideoAvailable(r.ok))
+      .catch(()=>setRunVideoAvailable(false));
+  },[selRunId]);
 
   const seqClips=(result?.sequential_clips)||[];
   const nonSeqShorts=(result?.non_sequential_shorts)||[];
