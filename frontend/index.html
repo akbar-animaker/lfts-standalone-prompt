@@ -379,25 +379,25 @@ function ArchitectureTab() {
 // ─────────────────────────────────────────────────────────────────────────────
 // CODE TAB — editable standalone.py with hot-reload
 // ─────────────────────────────────────────────────────────────────────────────
-function CodeTab({ code, onSave, onSaveAndRun, running }) {
+function CodeTab({ code, onRunWithCode, running }) {
   const [draft, setDraft] = useState(code || '');
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => { setDraft(code || ''); }, [code]);
 
-  const isDirty = draft !== code;
+  const isModified = draft !== code;
 
-  const handleSave = async () => {
-    setSaving(true);
-    try { await onSave(draft); } finally { setSaving(false); }
+  const handleDownload = () => {
+    const blob = new Blob([draft], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'standalone.py';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
-  const handleSaveAndRun = async () => {
-    setSaving(true);
-    try {
-      await onSave(draft);
-      await onSaveAndRun();
-    } finally { setSaving(false); }
+  const handleReset = () => {
+    if(confirm('Discard session edits and revert to the saved code?')) setDraft(code);
   };
 
   return (
@@ -406,17 +406,21 @@ function CodeTab({ code, onSave, onSaveAndRun, running }) {
       <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-surface flex-shrink-0">
         <div className="flex items-center gap-3">
           <span className="text-sm font-semibold text-gray-200 font-mono">standalone.py</span>
-          <span className="text-xs text-gray-500">Pipeline source — edit and run directly</span>
-          {isDirty && <span className="text-xs text-amber-400 font-medium">● unsaved changes</span>}
+          <span className="text-xs text-gray-500">Session-only edits — not saved to disk</span>
+          {isModified && <span className="text-xs text-amber-400 font-medium">● modified</span>}
         </div>
         <div className="flex gap-2">
-          <button onClick={handleSave} disabled={!isDirty || saving}
-            className={`px-3 py-1.5 text-xs rounded font-medium transition-colors ${isDirty && !saving ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-gray-800 text-gray-500 cursor-not-allowed'}`}>
-            {saving ? 'Saving…' : 'Save'}
+          <button onClick={handleDownload} title="Download current editor state as standalone.py"
+            className="px-3 py-1.5 text-xs rounded font-medium transition-colors bg-gray-800 hover:bg-gray-700 text-gray-300 flex items-center gap-1">
+            ⬇ Download
           </button>
-          <button onClick={handleSaveAndRun} disabled={saving || running}
-            className={`flex items-center gap-1.5 px-4 py-1.5 text-xs rounded font-semibold transition-colors ${!saving && !running ? 'bg-accent hover:bg-violet-600 text-white shadow shadow-violet-900/40' : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}>
-            {saving ? '⏳ Saving…' : running ? '⏳ Running…' : '▶ Save & Run'}
+          <button onClick={handleReset} disabled={!isModified}
+            className={`px-3 py-1.5 text-xs rounded font-medium transition-colors ${isModified ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-gray-800 text-gray-500 cursor-not-allowed'}`}>
+            Reset
+          </button>
+          <button onClick={() => onRunWithCode(draft)} disabled={running}
+            className={`flex items-center gap-1.5 px-4 py-1.5 text-xs rounded font-semibold transition-colors ${!running ? 'bg-accent hover:bg-violet-600 text-white shadow shadow-violet-900/40' : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}>
+            {running ? '⏳ Running…' : '▶ Run with Changes'}
           </button>
         </div>
       </div>
@@ -426,7 +430,10 @@ function CodeTab({ code, onSave, onSaveAndRun, running }) {
       </div>
       {/* Status bar */}
       <div className="px-4 py-1.5 border-t border-border bg-surface text-xs text-gray-500 flex justify-between flex-shrink-0">
-        <span>Changes are <span className="text-green-400 font-medium">hot-reloaded</span> — no server restart needed. The next run uses the updated code.</span>
+        <span>
+          Edits are <span className="text-amber-400 font-medium">session-only</span> — applied to the run via exec, never written to disk.
+          Refresh to revert to the saved version.
+        </span>
         <span className="font-mono">{draft.split('\n').length.toLocaleString()} lines · {draft.length.toLocaleString()} chars</span>
       </div>
     </div>
@@ -448,27 +455,38 @@ const PROMPT_LABELS = {
   THUMBNAIL_IMAGE_INSTRUCTION:   { label:'Thumbnail Image Brief',  icon:'🎨', step:'Stage 6', desc:'Final instruction sent to the image model' },
 };
 
-function PromptsTab({ prompts, onSave, onReset }) {
+function PromptsTab({ prompts, drafts, onDraftChange, onReset }) {
   const [selected,setSelected] = useState('SPEAKER_DETECTION_PROMPT');
-  const [draft,setDraft] = useState({});
-  const [saving,setSaving] = useState(false);
 
-  useEffect(()=>{ setDraft(p=>({...p,[selected]:prompts[selected]??''})); },[selected,prompts]);
+  const currentValue = drafts[selected] ?? prompts[selected] ?? '';
+  const isModified = key => (drafts[key] ?? prompts[key]) !== prompts[key];
+  const anyModified = Object.keys(PROMPT_LABELS).some(isModified);
 
-  const isDirty = draft[selected]!==undefined && draft[selected]!==prompts[selected];
+  const handleReset = () => {
+    if(!confirm(`Reset "${PROMPT_LABELS[selected]?.label}" to the current saved value?`)) return;
+    onReset(selected);
+  };
 
-  const handleSave = async()=>{ setSaving(true); try{await onSave({[selected]:draft[selected]});}finally{setSaving(false);} };
-  const handleReset = async()=>{
-    if(!confirm(`Reset "${PROMPT_LABELS[selected]?.label}" to its default?`))return;
-    const val=await onReset(selected);
-    setDraft(p=>({...p,[selected]:val}));
+  const handleDownloadAll = () => {
+    const lines = Object.entries(PROMPT_LABELS).map(([key,meta]) => {
+      const val = drafts[key] ?? prompts[key] ?? '';
+      return `# ── ${meta.label} (${key}) ──\n${val}`;
+    }).join('\n\n' + '─'.repeat(60) + '\n\n');
+    const blob = new Blob([lines], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'prompts_session.txt'; a.click();
+    URL.revokeObjectURL(url);
   };
 
   return(
     <div className="flex fade-in" style={{height:'calc(100vh - 112px)'}}>
       {/* Sidebar */}
-      <div className="w-60 flex-shrink-0 border-r border-border overflow-y-auto">
-        <div className="px-3 py-2 border-b border-border text-xs text-gray-500 font-medium uppercase tracking-wide">Pipeline Order</div>
+      <div className="w-60 flex-shrink-0 border-r border-border overflow-y-auto flex flex-col">
+        <div className="px-3 py-2 border-b border-border text-xs text-gray-500 font-medium uppercase tracking-wide flex items-center justify-between">
+          <span>Pipeline Order</span>
+          {anyModified && <span className="text-amber-400 text-xs">● modified</span>}
+        </div>
         {Object.entries(PROMPT_LABELS).map(([key,meta])=>(
           <button key={key} onClick={()=>setSelected(key)}
             className={`w-full text-left px-3 py-2.5 border-b border-border/50 transition-all ${selected===key?'bg-indigo-900/40 border-l-2 border-l-accent':'hover:bg-surface'}`}>
@@ -479,9 +497,7 @@ function PromptsTab({ prompts, onSave, onReset }) {
                 <div className="text-xs text-gray-500 mt-0.5">{meta.step} · {meta.desc}</div>
               </div>
             </div>
-            {draft[key]!==undefined&&draft[key]!==prompts[key]&&(
-              <div className="text-xs text-amber-400 mt-1 pl-6">● unsaved</div>
-            )}
+            {isModified(key) && <div className="text-xs text-amber-400 mt-1 pl-6">● modified this session</div>}
           </button>
         ))}
       </div>
@@ -491,25 +507,28 @@ function PromptsTab({ prompts, onSave, onReset }) {
           <div>
             <span className="text-sm font-semibold text-gray-200">{PROMPT_LABELS[selected]?.label}</span>
             <span className="ml-2 text-xs text-gray-500 font-mono">{selected}</span>
-            {isDirty&&<span className="ml-2 text-xs text-amber-400">● unsaved</span>}
+            {isModified(selected) && <span className="ml-2 text-xs text-amber-400">● modified</span>}
           </div>
           <div className="flex gap-2">
-            <button onClick={handleReset}
-              className="px-3 py-1.5 text-xs rounded bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors">
-              Reset to Default
+            <button onClick={handleDownloadAll} title="Download all prompts (with session edits)"
+              className="px-3 py-1.5 text-xs rounded bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors flex items-center gap-1">
+              ⬇ Download
             </button>
-            <button onClick={handleSave} disabled={!isDirty||saving}
-              className={`px-4 py-1.5 text-xs rounded font-medium transition-colors ${isDirty&&!saving?'bg-accent hover:bg-violet-600 text-white':'bg-gray-700 text-gray-500 cursor-not-allowed'}`}>
-              {saving?'Saving…':'Save Prompt'}
+            <button onClick={handleReset} disabled={!isModified(selected)}
+              className={`px-3 py-1.5 text-xs rounded transition-colors ${isModified(selected)?'bg-gray-700 hover:bg-gray-600 text-gray-300':'bg-gray-800 text-gray-600 cursor-not-allowed'}`}>
+              Reset
             </button>
           </div>
         </div>
         <div className="flex-1 monaco-wrap" style={{borderRadius:0,border:'none'}}>
-          <MonacoEditor key={selected} value={draft[selected]??prompts[selected]??''} onChange={v=>setDraft(p=>({...p,[selected]:v}))} language="markdown"/>
+          <MonacoEditor key={selected} value={currentValue} onChange={v=>onDraftChange(selected,v)} language="markdown"/>
         </div>
         <div className="px-4 py-2 border-t border-border bg-surface text-xs text-gray-500 flex justify-between">
-          <span>Variables like <code className="text-violet-300">{'{video_category}'}</code> are filled at runtime by the pipeline.</span>
-          <span>{(draft[selected]??prompts[selected]??'').length} chars</span>
+          <span>
+            Edits are <span className="text-amber-400 font-medium">session-only</span> — used in the next run but not saved to disk.
+            Refresh to revert. Variables like <code className="text-violet-300">{'{video_category}'}</code> are filled at runtime.
+          </span>
+          <span>{currentValue.length} chars</span>
         </div>
       </div>
     </div>
@@ -1530,14 +1549,15 @@ function ExportTab({ run }) {
 // ─────────────────────────────────────────────────────────────────────────────
 function App() {
   const [activeTab,setActiveTab]=useState('architecture');
-  const [prompts,setPrompts]=useState({});
+  const [prompts,setPrompts]=useState({});       // disk values — never mutated client-side
+  const [promptDrafts,setPromptDrafts]=useState({});  // session edits — reset on refresh
   const [config,setConfig]=useState({});
   const [schema,setSchema]=useState({});
   const [versions,setVersions]=useState([]);
   const [run,setRun]=useState(null);
   const [status,setStatus]=useState(null);
   const [videoAvailable,setVideoAvailable]=useState(false);
-  const [code,setCode]=useState('');
+  const [code,setCode]=useState('');             // disk value
   const [toast,setToast]=useState(null);
   const sseRef=useRef(null);
 
@@ -1548,7 +1568,8 @@ function App() {
       api.get('/prompts'),api.get('/config'),api.get('/config/schema'),
       api.get('/versions'),api.get('/status'),api.get('/video/info'),api.get('/code'),
     ]).then(([p,c,s,v,st,vi,cd])=>{
-      setPrompts(p);setConfig(c);setSchema(s);
+      setPrompts(p);setPromptDrafts({...p});  // drafts start equal to disk
+      setConfig(c);setSchema(s);
       setVersions(v.versions||[]);setStatus(st);
       setVideoAvailable(vi.exists||false);
       setCode(cd.content||'');
@@ -1584,11 +1605,18 @@ function App() {
     sseRef.current=es;
   },[]);
 
-  const handleStartRun=async(clipMode,saveVer)=>{
+  // Start a run — always sends current session drafts as overrides (never reads from disk for prompts).
+  // Optional codeOverride lets the Code tab inject its draft without a disk write.
+  const handleStartRun=async(clipMode,saveVer,{codeOverride}={})=>{
     setRun({id:null,status:'starting',logs:[],result:null});
     setActiveTab('logs');
     try{
-      const {run_id}=await api.post('/run',{clip_mode:clipMode,save_version:saveVer});
+      const {run_id}=await api.post('/run',{
+        clip_mode:clipMode,
+        save_version:saveVer,
+        prompt_overrides:promptDrafts,
+        code_override:codeOverride||null,
+      });
       setRun(p=>({...p,id:run_id,status:'running'}));
       startSSE(run_id);
     }catch(err){
@@ -1597,24 +1625,33 @@ function App() {
     }
   };
 
-  const handleSaveCode=async(content)=>{
-    const r=await api.put('/code',{content});
-    setCode(content);
-    if(r.reload_warning) showToast('Code saved — reload warning: '+r.reload_warning,'error');
-    else showToast('Code saved & hot-reloaded ✓','success');
+  // Prompt draft handlers — session-only, no server writes
+  const handlePromptDraftChange=(key,value)=>setPromptDrafts(p=>({...p,[key]:value}));
+  const handleResetPromptDraft=(key)=>{
+    setPromptDrafts(p=>({...p,[key]:prompts[key]??''}));
+    showToast('Prompt reset to saved value.','info');
   };
-  const handleSavePrompts=async(u)=>{ const r=await api.put('/prompts',u);setPrompts(r);showToast('Prompt saved!','success'); };
-  const handleResetPrompt=async(n)=>{ const {value}=await api.post(`/prompts/${n}/reset`);setPrompts(p=>({...p,[n]:value}));showToast('Reset to default.','info');return value; };
+
+  // Config handlers — still persisted (config is shared intentionally)
   const handleSaveConfig=async(u)=>{ const r=await api.put('/config',u);setConfig(r);showToast('Config saved!','success'); };
   const handleResetConfig=async()=>{ const r=await api.post('/config/reset');setConfig(r);showToast('Config reset.','info'); };
+
+  // Version handlers — restoring a version also refreshes prompt/code disk values and resets drafts
   const handleSaveVersion=async(note)=>{ await api.post('/versions',{note});const{versions:vv}=await api.get('/versions');setVersions(vv);showToast('Version saved!','success'); };
-  const handleRestoreVersion=async(id)=>{ await api.post(`/versions/${id}/restore`);const[p,c]=await Promise.all([api.get('/prompts'),api.get('/config')]);setPrompts(p);setConfig(c);const{versions:vv}=await api.get('/versions');setVersions(vv);showToast('Version restored!','success'); };
+  const handleRestoreVersion=async(id)=>{
+    await api.post(`/versions/${id}/restore`);
+    const[p,c]=await Promise.all([api.get('/prompts'),api.get('/config')]);
+    setPrompts(p);setPromptDrafts({...p});  // reset session drafts to restored values
+    setConfig(c);
+    const{versions:vv}=await api.get('/versions');setVersions(vv);
+    showToast('Version restored — session drafts reset.','success');
+  };
   const handleDeleteVersion=async(id)=>{ await api.del(`/versions/${id}`);setVersions(p=>p.filter(v=>v.id!==id));showToast('Deleted.','info'); };
 
   const tabs=[
     {key:'architecture',label:'Architecture',icon:'🏗️'},
-    {key:'code',        label:'Code',         icon:'💻'},
-    {key:'prompts',     label:'Prompts',      icon:'✏️'},
+    {key:'code',        label:'Code',         icon:'💻',  badge:Object.keys(promptDrafts).some(k=>(promptDrafts[k]??prompts[k])!==prompts[k])?null:null},
+    {key:'prompts',     label:'Prompts',      icon:'✏️',  badge:Object.keys(PROMPT_LABELS).some(k=>(promptDrafts[k]??prompts[k])!==prompts[k])?'●':null},
     {key:'config',      label:'Config',       icon:'⚙️'},
     {key:'logs',        label:'Logs',         icon:'📋',badge:run?.status==='running'?'●':null},
     {key:'output',      label:'Output',       icon:'📊',badge:run?.result?(run.result.sequential_clips?.length||0)+(run.result.non_sequential_shorts?.length||0):null},
@@ -1677,8 +1714,8 @@ function App() {
       <main className="flex-1 overflow-hidden">
         <div className="h-full overflow-y-auto">
           {activeTab==='architecture'&&<div style={{height:'calc(100vh - 112px)'}}><ArchitectureTab/></div>}
-          {activeTab==='code'&&<CodeTab code={code} onSave={handleSaveCode} onSaveAndRun={()=>handleStartRun(config.CLIP_MODE||'both',false)} running={run?.status==='running'}/>}
-          {activeTab==='prompts'&&<PromptsTab prompts={prompts} onSave={handleSavePrompts} onReset={handleResetPrompt}/>}
+          {activeTab==='code'&&<CodeTab code={code} onRunWithCode={c=>handleStartRun(config.CLIP_MODE||'both',false,{codeOverride:c})} running={run?.status==='running'}/>}
+          {activeTab==='prompts'&&<PromptsTab prompts={prompts} drafts={promptDrafts} onDraftChange={handlePromptDraftChange} onReset={handleResetPromptDraft}/>}
           {activeTab==='config'&&<ConfigTab config={config} schema={schema} onSave={handleSaveConfig} onReset={handleResetConfig}/>}
           {activeTab==='logs'&&<LogsTab run={run} onStartRun={handleStartRun} status={status}/>}
           {activeTab==='output'&&<OutputTab run={run} videoAvailable={videoAvailable}/>}

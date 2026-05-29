@@ -74,6 +74,8 @@ class RunRequest(BaseModel):
     transcript_path: Optional[str] = None
     video_path: Optional[str] = None
     save_version: bool = False
+    prompt_overrides: Optional[Dict[str, str]] = None   # session-only, never written to disk
+    code_override: Optional[str] = None                 # session-only, applied via exec
 
 
 @router.post("/run")
@@ -95,6 +97,8 @@ def start_run(req: RunRequest):
             video_path=video_path,
             clip_mode=req.clip_mode,
             save_version_flag=req.save_version,
+            prompt_overrides=req.prompt_overrides,
+            code_override=req.code_override,
         )
         return {"run_id": run_id, "status": "started"}
     except RuntimeError as e:

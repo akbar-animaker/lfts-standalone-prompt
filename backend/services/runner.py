@@ -197,6 +197,8 @@ def start_run(
     video_path: Optional[str],
     clip_mode: str = "both",
     save_version_flag: bool = False,
+    prompt_overrides: Optional[Dict[str, str]] = None,
+    code_override: Optional[str] = None,
 ) -> str:
     global _active_run_id
 
@@ -209,10 +211,18 @@ def start_run(
         _runs[run_id] = run_state
         _active_run_id = run_id
 
-    # Load and apply current overrides
-    prompts = get_prompts()
+    # Use request-time prompt overrides if provided, otherwise fall back to disk values.
+    # This keeps the run session-local — nothing is written to disk.
+    prompts = prompt_overrides if prompt_overrides is not None else get_prompts()
     config = get_config()
     _apply_overrides(prompts, config)
+
+    # Apply session-only code override via exec — no disk write.
+    if code_override:
+        try:
+            exec(compile(code_override, "<session_code_override>", "exec"), vars(_sa))
+        except Exception as e:
+            raise RuntimeError(f"Code override failed to compile/execute: {e}")
 
     if save_version_flag:
         save_version(note=f"Auto-save before run {run_id}")
