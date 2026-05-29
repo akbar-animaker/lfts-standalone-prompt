@@ -177,8 +177,61 @@ def get_run_result(run_id: str):
 
     saved = storage.get_run_result(run_id)
     if saved:
-        return saved.get("result") or saved
+        result_data = saved.get("result") or saved
+        # Inject video_path so the frontend knows which video belongs to this run
+        if isinstance(result_data, dict) and "video_path" not in result_data:
+            result_data = {**result_data, "video_path": saved.get("video_path", "")}
+        return result_data
     raise HTTPException(status_code=404, detail="Result not found")
+
+
+@router.get("/runs/{run_id}/video")
+async def serve_run_video(run_id: str, request: Request):
+    """Serve the video for a specific run — isolated from the global VIDEO_PATH."""
+    from fastapi.responses import RedirectResponse
+    _BASE_R = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    args_path = os.path.join(_BASE_R, "storage", "runs", run_id, "run_args.json")
+    if not os.path.exists(args_path):
+        raise HTTPException(status_code=404, detail="Run not found")
+    with open(args_path, "r", encoding="utf-8") as f:
+        run_args = json.load(f)
+    video_path = run_args.get("video_path", "")
+    if not video_path:
+        raise HTTPException(status_code=404, detail="No video recorded for this run")
+    if video_path.startswith(("http://", "https://")):
+        return RedirectResponse(url=video_path)
+    if not os.path.exists(video_path):
+        raise HTTPException(status_code=404, detail="Video file not found on disk")
+
+    file_size = os.path.getsize(video_path)
+    range_header = request.headers.get("range")
+    ext = os.path.splitext(video_path)[1].lower()
+    mime = {"mp4": "video/mp4", "mov": "video/quicktime",
+            "avi": "video/x-msvideo", "mkv": "video/x-matroska"}.get(ext.lstrip("."), "video/mp4")
+
+    if not range_header:
+        return StreamingResponse(
+            _iter_file(video_path, 0, file_size - 1),
+            status_code=200,
+            media_type=mime,
+            headers={"Accept-Ranges": "bytes", "Content-Length": str(file_size)},
+        )
+
+    range_val = range_header.replace("bytes=", "")
+    start_str, end_str = range_val.split("-")
+    start = int(start_str)
+    end = int(end_str) if end_str else file_size - 1
+    length = end - start + 1
+    return StreamingResponse(
+        _iter_file(video_path, start, end),
+        status_code=206,
+        media_type=mime,
+        headers={
+            "Content-Range": f"bytes {start}-{end}/{file_size}",
+            "Accept-Ranges": "bytes",
+            "Content-Length": str(length),
+        },
+    )
 
 
 # ── Versions ───────────────────────────────────────────────────────────────────

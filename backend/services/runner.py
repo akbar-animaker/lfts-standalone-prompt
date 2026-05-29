@@ -33,9 +33,10 @@ _state_lock = threading.Lock()
 
 
 class RunState:
-    def __init__(self, run_id: str):
-        self.run_id    = run_id
-        self.status    = "starting"
+    def __init__(self, run_id: str, video_path: str = ""):
+        self.run_id     = run_id
+        self.video_path = video_path
+        self.status     = "starting"
         self.logs: list = []
         self.result: Optional[Dict] = None
         self.error: Optional[str]   = None
@@ -96,6 +97,7 @@ def _read_worker(run_state: RunState, proc: subprocess.Popen):
                         "end_time":   run_state.end_time,
                         "summary":    summary,
                         "result":     result,
+                        "video_path": run_state.video_path,
                     })
                     run_state.log_queue.put({"type": "done", "status": "success", "summary": summary})
                 else:
@@ -141,7 +143,7 @@ def start_run(
     global _active_run_id
 
     run_id     = uuid.uuid4().hex[:8]
-    run_state  = RunState(run_id)
+    run_state  = RunState(run_id, video_path=video_path or "")
 
     with _state_lock:
         _runs[run_id] = run_state
