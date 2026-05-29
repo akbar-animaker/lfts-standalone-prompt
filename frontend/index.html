@@ -1059,16 +1059,13 @@ function StageFlowTable({ run }) {
 // INLINE CLIP PLAYER (used inside ClipDetailPanel)
 // ─────────────────────────────────────────────────────────────────────────────
 function InlineClipPlayer({ clip, videoUrl }) {
-  const videoRef  = useRef(null);
-  const segsRef   = useRef([]);   // [{start, end}, ...]
-  const idxRef    = useRef(0);    // which segment we're currently playing
-  const [segIdx, setSegIdx] = useState(0); // for UI badge
+  const videoRef    = useRef(null);
+  const segsRef     = useRef([]);
+  const idxRef      = useRef(0);
+  const seekingRef  = useRef(false); // lock: prevents re-entrant seeks during timeupdate
 
-  // Build the segments list from the clip object.
-  // Clips with _play_segments get multi-segment walk-through.
-  // Sequential (or single-segment overrides) just have one entry.
   const buildSegs = (c) => {
-    if(c?._play_segments && c._play_segments.length > 0) return c._play_segments;
+    if(c?._play_segments?.length > 0) return c._play_segments;
     const s = c?.video_start_time ?? 0;
     const e = c?.video_end_time   ?? Infinity;
     return [{ start: s, end: e }];
@@ -1076,12 +1073,12 @@ function InlineClipPlayer({ clip, videoUrl }) {
 
   const seekTo = (video, time) => { try{ video.currentTime = time; }catch(ex){} };
 
-  // Reset and seek to segment 0 whenever the clip changes
+  // Reset to segment 0 whenever clip or url changes
   useEffect(()=>{
     const segs = buildSegs(clip);
-    segsRef.current = segs;
-    idxRef.current  = 0;
-    setSegIdx(0);
+    segsRef.current  = segs;
+    idxRef.current   = 0;
+    seekingRef.current = false;
     const video = videoRef.current;
     if(!video || segs.length === 0) return;
     const doSeek = ()=> seekTo(video, segs[0].start);
@@ -1090,7 +1087,7 @@ function InlineClipPlayer({ clip, videoUrl }) {
       video.addEventListener('loadedmetadata', doSeek, {once:true});
       return ()=> video.removeEventListener('loadedmetadata', doSeek);
     }
-  },[clip, videoUrl]);   // eslint-disable-line
+  },[clip, videoUrl]); // eslint-disable-line
 
   const handleLoadedMetadata = ()=>{
     const segs = segsRef.current;
@@ -1101,45 +1098,30 @@ function InlineClipPlayer({ clip, videoUrl }) {
     const video = videoRef.current;
     const segs  = segsRef.current;
     const idx   = idxRef.current;
-    if(!video || !segs[idx]) return;
+    if(!video || !segs[idx] || seekingRef.current) return;
 
-    if(video.currentTime >= segs[idx].end - 0.05){
+    if(video.currentTime >= segs[idx].end){
+      seekingRef.current = true;
       if(idx + 1 < segs.length){
-        // Jump to next segment
         const next = idx + 1;
         idxRef.current = next;
-        setSegIdx(next);
         seekTo(video, segs[next].start);
-        // keep playing — don't pause
+        // Release the lock once the seek settles
+        video.addEventListener('seeked', ()=>{ seekingRef.current = false; }, {once:true});
       } else {
-        // All segments done
         video.pause();
         seekTo(video, segs[idx].end);
+        seekingRef.current = false;
       }
     }
   };
 
-  const segs = buildSegs(clip);
-  const isMulti = segs.length > 1;
-
   return(
-    <div className="relative bg-black">
-      <video ref={videoRef} src={videoUrl}
-        onLoadedMetadata={handleLoadedMetadata}
-        onTimeUpdate={handleTimeUpdate}
-        controls
-        className="w-full block" style={{maxHeight:'190px'}}/>
-      {isMulti&&(
-        <div className="absolute top-2 right-2 flex gap-1">
-          {segs.map((s,i)=>(
-            <button key={i} onClick={()=>{ idxRef.current=i; setSegIdx(i); seekTo(videoRef.current,s.start); }}
-              className={`text-xs px-1.5 py-0.5 rounded font-mono transition-all ${i===segIdx?'bg-violet-600 text-white':'bg-black/60 text-gray-400 hover:bg-violet-900/60 hover:text-violet-300'}`}>
-              S{i+1}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <video ref={videoRef} src={videoUrl}
+      onLoadedMetadata={handleLoadedMetadata}
+      onTimeUpdate={handleTimeUpdate}
+      controls
+      className="w-full block" style={{maxHeight:'190px',background:'#000'}}/>
   );
 }
 
