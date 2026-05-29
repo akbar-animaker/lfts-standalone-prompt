@@ -1574,7 +1574,7 @@ function App() {
   const [run,setRun]=useState(null);
   const [status,setStatus]=useState(null);
   const [videoAvailable,setVideoAvailable]=useState(false);
-  const [code,setCode]=useState('');             // disk value
+  const [code,setCode]=useState('');
   const [toast,setToast]=useState(null);
   const [fetching,setFetching]=useState(false);
   const [projectId,setProjectId]=useState('');
@@ -1644,6 +1644,28 @@ function App() {
     }
   };
 
+  const handleFetchProject=async(projectId,clipMode,saveVer)=>{
+    const pid=(projectId||'').trim();
+    if(!pid){ showToast('Enter a Project ID first','error'); return; }
+    setFetching(true);
+    try{
+      showToast(`Fetching project ${pid}…`,'info');
+      const r=await api.post('/project/fetch',{project_id:pid});
+      if(!r||r.status!=='success') throw new Error(r?.detail||'Failed to fetch project');
+      // Refresh status / video / config so the UI reflects the downloaded files
+      const [st,vi,c]=await Promise.all([api.get('/status'),api.get('/video/info'),api.get('/config')]);
+      setStatus(st); setVideoAvailable(vi.exists||false); setConfig(c);
+      if(r.warning) showToast(r.warning,'error');
+      else showToast(`Downloaded transcript${r.video_path?' + video':''} ✓`,'success');
+      // Process the flow
+      await handleStartRun(clipMode,saveVer);
+    }catch(err){
+      showToast(err.message||'Failed to fetch project','error');
+    }finally{
+      setFetching(false);
+    }
+  };
+
   // Prompt draft handlers — session-only, no server writes
   const handlePromptDraftChange=(key,value)=>setPromptDrafts(p=>({...p,[key]:value}));
   const handleResetPromptDraft=(key)=>{
@@ -1651,11 +1673,8 @@ function App() {
     showToast('Prompt reset to saved value.','info');
   };
 
-  // Config handlers — still persisted (config is shared intentionally)
   const handleSaveConfig=async(u)=>{ const r=await api.put('/config',u);setConfig(r);showToast('Config saved!','success'); };
   const handleResetConfig=async()=>{ const r=await api.post('/config/reset');setConfig(r);showToast('Config reset.','info'); };
-
-  // Version handlers — restoring a version also refreshes prompt/code disk values and resets drafts
   const handleSaveVersion=async(note)=>{ await api.post('/versions',{note});const{versions:vv}=await api.get('/versions');setVersions(vv);showToast('Version saved!','success'); };
   const handleRestoreVersion=async(id)=>{
     await api.post(`/versions/${id}/restore`);
@@ -1669,7 +1688,7 @@ function App() {
 
   const tabs=[
     {key:'architecture',label:'Architecture',icon:'🏗️'},
-    {key:'code',        label:'Code',         icon:'💻',  badge:Object.keys(promptDrafts).some(k=>(promptDrafts[k]??prompts[k])!==prompts[k])?null:null},
+    {key:'code',        label:'Code',         icon:'💻'},
     {key:'prompts',     label:'Prompts',      icon:'✏️',  badge:Object.keys(PROMPT_LABELS).some(k=>(promptDrafts[k]??prompts[k])!==prompts[k])?'●':null},
     {key:'config',      label:'Config',       icon:'⚙️'},
     {key:'logs',        label:'Logs',         icon:'📋',badge:run?.status==='running'?'●':null},
